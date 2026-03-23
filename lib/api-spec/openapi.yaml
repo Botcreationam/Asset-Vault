@@ -1,22 +1,30 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: AcadVault API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: folders
+    description: Folder management
+  - name: resources
+    description: Resource management
+  - name: units
+    description: Units / credits management
+  - name: admin
+    description: Admin operations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +32,362 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/user:
+    get:
+      operationId: getCurrentAuthUser
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetCurrentAuthUserResponse"
+
+  /folders:
+    get:
+      operationId: listFolders
+      tags: [folders]
+      summary: List folders at root or within a parent
+      parameters:
+        - name: parentId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of folders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FolderListResponse"
+    post:
+      operationId: createFolder
+      tags: [folders]
+      summary: Create a new folder (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFolderBody"
+      responses:
+        "201":
+          description: Folder created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Folder"
+
+  /folders/{folderId}:
+    get:
+      operationId: getFolder
+      tags: [folders]
+      summary: Get a folder by ID
+      parameters:
+        - name: folderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Folder details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Folder"
+    delete:
+      operationId: deleteFolder
+      tags: [folders]
+      summary: Delete a folder (admin only)
+      parameters:
+        - name: folderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /resources:
+    get:
+      operationId: listResources
+      tags: [resources]
+      summary: List resources in a folder
+      parameters:
+        - name: folderId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of resources
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceListResponse"
+    post:
+      operationId: createResource
+      tags: [resources]
+      summary: Upload a new resource (admin only)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreateResourceBody"
+      responses:
+        "201":
+          description: Resource created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resource"
+
+  /resources/{resourceId}:
+    get:
+      operationId: getResource
+      tags: [resources]
+      summary: Get resource metadata
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Resource details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resource"
+    delete:
+      operationId: deleteResource
+      tags: [resources]
+      summary: Delete a resource (admin only)
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+    patch:
+      operationId: updateResource
+      tags: [resources]
+      summary: Update resource metadata (admin only)
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateResourceBody"
+      responses:
+        "200":
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resource"
+
+  /resources/{resourceId}/view:
+    get:
+      operationId: viewResource
+      tags: [resources]
+      summary: Get a temporary signed URL for in-browser viewing (authenticated)
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Signed view URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceViewResponse"
+
+  /resources/{resourceId}/download:
+    post:
+      operationId: downloadResource
+      tags: [resources]
+      summary: Spend units to get a download URL (authenticated)
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Download URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceDownloadResponse"
+
+  /units/balance:
+    get:
+      operationId: getUnitsBalance
+      tags: [units]
+      summary: Get current user's unit balance
+      responses:
+        "200":
+          description: Balance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnitsBalanceResponse"
+
+  /units/transactions:
+    get:
+      operationId: getUnitsTransactions
+      tags: [units]
+      summary: Get current user's transaction history
+      responses:
+        "200":
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnitsTransactionListResponse"
+
+  /units/topup:
+    post:
+      operationId: topUpUnits
+      tags: [units]
+      summary: Add units to account (admin or payment flow)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TopUpUnitsBody"
+      responses:
+        "200":
+          description: Updated balance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnitsBalanceResponse"
+
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      tags: [admin]
+      summary: List all users (admin only)
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserListResponse"
+
+  /admin/users/{userId}/role:
+    patch:
+      operationId: adminUpdateUserRole
+      tags: [admin]
+      summary: Update a user's role (admin only)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRoleBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+
+  /admin/users/{userId}/units:
+    post:
+      operationId: adminGrantUnits
+      tags: [admin]
+      summary: Grant units to a user (admin only)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrantUnitsBody"
+      responses:
+        "200":
+          description: Updated balance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnitsBalanceResponse"
+
+  /folder-path/{folderId}:
+    get:
+      operationId: getFolderPath
+      tags: [folders]
+      summary: Get breadcrumb path for a folder
+      parameters:
+        - name: folderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Folder path (breadcrumbs)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FolderPathResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +398,336 @@ components:
       required:
         - status
 
+    GetCurrentAuthUserResponse:
+      type: object
+      properties:
+        authenticated:
+          type: boolean
+        user:
+          $ref: "#/components/schemas/AuthUser"
+      required:
+        - authenticated
+
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        profileImageUrl:
+          type: string
+        role:
+          type: string
+          enum: [student, admin]
+        unitsBalance:
+          type: integer
+      required:
+        - id
+        - role
+        - unitsBalance
+
+    Folder:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        parentId:
+          type: string
+        level:
+          type: integer
+        icon:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        resourceCount:
+          type: integer
+        subfolderCount:
+          type: integer
+      required:
+        - id
+        - name
+        - level
+        - createdAt
+
+    FolderListResponse:
+      type: object
+      properties:
+        folders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Folder"
+      required:
+        - folders
+
+    FolderPathResponse:
+      type: object
+      properties:
+        path:
+          type: array
+          items:
+            $ref: "#/components/schemas/Folder"
+      required:
+        - path
+
+    CreateFolderBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        parentId:
+          type: string
+        icon:
+          type: string
+      required:
+        - name
+
+    Resource:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [pdf, slides, notes, book, video, other]
+        folderId:
+          type: string
+        fileSize:
+          type: integer
+        mimeType:
+          type: string
+        downloadCost:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        uploadedBy:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        downloadCount:
+          type: integer
+        viewCount:
+          type: integer
+      required:
+        - id
+        - name
+        - type
+        - folderId
+        - downloadCost
+        - createdAt
+
+    ResourceListResponse:
+      type: object
+      properties:
+        resources:
+          type: array
+          items:
+            $ref: "#/components/schemas/Resource"
+      required:
+        - resources
+
+    CreateResourceBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+        folderId:
+          type: string
+        downloadCost:
+          type: integer
+        tags:
+          type: string
+        file:
+          type: string
+          format: binary
+      required:
+        - name
+        - type
+        - folderId
+        - file
+
+    UpdateResourceBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+        downloadCost:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+
+    ResourceViewResponse:
+      type: object
+      properties:
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+        - url
+        - expiresAt
+
+    ResourceDownloadResponse:
+      type: object
+      properties:
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        unitsSpent:
+          type: integer
+        newBalance:
+          type: integer
+      required:
+        - url
+        - expiresAt
+        - unitsSpent
+        - newBalance
+
+    UnitsBalanceResponse:
+      type: object
+      properties:
+        balance:
+          type: integer
+      required:
+        - balance
+
+    UnitsTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [credit, debit]
+        amount:
+          type: integer
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        resourceId:
+          type: string
+        resourceName:
+          type: string
+      required:
+        - id
+        - type
+        - amount
+        - description
+        - createdAt
+
+    UnitsTransactionListResponse:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnitsTransaction"
+      required:
+        - transactions
+
+    TopUpUnitsBody:
+      type: object
+      properties:
+        amount:
+          type: integer
+      required:
+        - amount
+
+    GrantUnitsBody:
+      type: object
+      properties:
+        amount:
+          type: integer
+        description:
+          type: string
+      required:
+        - amount
+
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        profileImageUrl:
+          type: string
+        role:
+          type: string
+          enum: [student, admin]
+        unitsBalance:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        downloadCount:
+          type: integer
+      required:
+        - id
+        - role
+        - unitsBalance
+        - createdAt
+
+    AdminUserListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUser"
+      required:
+        - users
+
+    UpdateUserRoleBody:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [student, admin]
+      required:
+        - role
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success

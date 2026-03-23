@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "AcadVault"
+version = "1.0.0"
+id = "artifacts/acadvault"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22689
+
+[services.development]
+run = "pnpm --filter @workspace/acadvault run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/acadvault", "run", "build" ]
+publicDir = "artifacts/acadvault/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22689"
+BASE_PATH = "/"

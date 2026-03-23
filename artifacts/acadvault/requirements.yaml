@@ -1,0 +1,16 @@
+packages:
+  "framer-motion": "For elegant page transitions and component animations"
+  "date-fns": "For formatting dates in transaction history and resource details"
+  "react-dropzone": "For beautiful drag-and-drop file uploads in the admin panel"
+  "@hookform/resolvers": "For form validation with Zod"
+  "react-hook-form": "For complex form state management"
+
+images:
+  - path: "artifacts/acadvault/public/images/hero-bg.png"
+    description: "A sophisticated, subtle abstract background depicting an architectural library interior mixed with digital glowing data streams. Deep indigo and teal tones, highly professional, slightly blurred for text readability, modern academic aesthetic."
+    aspect_ratio: "16:9"
+
+notes:
+  - Application uses Replit Auth via @workspace/replit-auth-web for authentication.
+  - The API baseUrl is /api and requires credentials: "include".
+  - Routing handles dynamic nested folders via query params or path params.
