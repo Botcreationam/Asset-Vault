@@ -2,16 +2,19 @@ import { useRoute, Link } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
 import {
   useGetResource,
-  useViewResource,
   useDownloadResource,
   useGetFolderPath,
 } from "@workspace/api-client-react";
 import { AuthWrapper } from "@/components/auth-wrapper";
+import {
+  SecureViewer,
+  SecureViewerSkeleton,
+  SecureViewerError,
+} from "@/components/secure-viewer";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import {
-  FileText,
   Download,
   Eye,
   Clock,
@@ -23,6 +26,7 @@ import {
   Folder,
   BookOpen,
   Loader2,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -66,11 +70,6 @@ export default function ResourceDetail() {
     query: { enabled: !!resourceId },
   });
 
-  const { data: viewData, isLoading: isLoadingView, isError: isViewError } = useViewResource(
-    resourceId,
-    { query: { enabled: !!resourceId, retry: false } }
-  );
-
   const { data: pathData } = useGetFolderPath(resource?.folderId || "", {
     query: { enabled: !!resource?.folderId },
   });
@@ -82,29 +81,27 @@ export default function ResourceDetail() {
         queryClient.invalidateQueries({ queryKey: ["/api/units/balance"] });
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
 
-        // Force immediate download via blob
         setIsDownloading(true);
         try {
           const response = await fetch(data.url);
-          if (!response.ok) throw new Error("Failed to fetch file");
+          if (!response.ok) throw new Error("Fetch failed");
           const blob = await response.blob();
           const blobUrl = URL.createObjectURL(blob);
-          const anchor = document.createElement("a");
-          anchor.href = blobUrl;
-          anchor.download = resource?.name || "download";
-          document.body.appendChild(anchor);
-          anchor.click();
-          document.body.removeChild(anchor);
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
+          const a = document.createElement("a");
+          a.href = blobUrl;
+          a.download = resource?.name || "download";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 15_000);
 
           toast({
             title: "Download started",
             description: `${data.unitsSpent} units used · ${data.newBalance} remaining`,
           });
         } catch {
-          // Fallback: open in new tab if fetch fails
           window.open(data.url, "_blank");
-          toast({ title: "Download ready", description: "File opened in a new tab." });
+          toast({ title: "Download ready", description: "Opening in a new tab." });
         } finally {
           setIsDownloading(false);
         }
@@ -133,7 +130,7 @@ export default function ResourceDetail() {
     setIsDownloadModalOpen(true);
   };
 
-  // ─── Loading ────────────────────────────────────────────────────────────────
+  // ── Loading ────────────────────────────────────────────────────────────────
   if (isLoadingResource) {
     return (
       <AuthWrapper>
@@ -152,7 +149,9 @@ export default function ResourceDetail() {
         <AlertCircle className="w-16 h-16 text-muted-foreground mb-4 opacity-40" />
         <h2 className="text-xl font-semibold mb-2">Resource not found</h2>
         <p className="text-muted-foreground mb-6">This resource may have been removed.</p>
-        <Button asChild variant="outline"><Link href="/browse">Browse Library</Link></Button>
+        <Button asChild variant="outline">
+          <Link href="/browse">Browse Library</Link>
+        </Button>
       </div>
     );
   }
@@ -181,7 +180,6 @@ export default function ResourceDetail() {
 
         {/* ── Info + Actions ── */}
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden mb-5">
-          {/* colour bar by type */}
           <div className={`h-1.5 w-full ${
             resource.type === "pdf" ? "bg-red-500" :
             resource.type === "slides" ? "bg-orange-500" :
@@ -190,7 +188,6 @@ export default function ResourceDetail() {
           }`} />
 
           <div className="p-6 md:p-8 flex flex-col lg:flex-row gap-8 items-start lg:items-center justify-between">
-            {/* Left: Title + meta */}
             <div className="flex items-start gap-5 flex-1 min-w-0">
               <div className="hidden sm:flex shrink-0 p-4 rounded-2xl bg-muted">
                 <BookOpen className="w-10 h-10 text-muted-foreground" />
@@ -200,14 +197,15 @@ export default function ResourceDetail() {
                   <Badge className={`uppercase text-[11px] tracking-wider border font-semibold ${TYPE_COLORS[resource.type] || ""}`}>
                     {resource.type}
                   </Badge>
+                  <Badge variant="outline" className="text-[10px] gap-1 border-green-300 text-green-700 dark:text-green-400">
+                    <Eye className="w-3 h-3" /> Free to read
+                  </Badge>
                 </div>
                 <h1 className="font-serif text-2xl md:text-3xl font-bold text-foreground leading-snug mb-2">
                   {resource.name}
                 </h1>
                 {resource.description && (
-                  <p className="text-muted-foreground leading-relaxed mb-4">
-                    {resource.description}
-                  </p>
+                  <p className="text-muted-foreground leading-relaxed mb-4">{resource.description}</p>
                 )}
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1.5">
@@ -232,7 +230,7 @@ export default function ResourceDetail() {
               </div>
             </div>
 
-            {/* Right: cost + download */}
+            {/* Cost + download */}
             <div className="shrink-0 flex flex-col gap-3 w-full lg:w-56">
               <div className="rounded-xl border border-border bg-background p-4 text-center">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
@@ -264,58 +262,40 @@ export default function ResourceDetail() {
                   <Link href="/account" className="underline underline-offset-2">Top up →</Link>
                 </p>
               )}
+
+              {/* Security notice */}
+              <div className="flex items-start gap-2 rounded-lg bg-muted/50 border border-border p-3 text-xs text-muted-foreground">
+                <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
+                <span>Reading is free and secure. Downloading requires units and is watermarked.</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ── Document Viewer ── */}
+        {/* ── Secure Document Viewer ── */}
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           {/* Viewer toolbar */}
           <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
             <div className="flex items-center gap-2">
-              <Eye className="w-4 h-4 text-primary" />
-              <span className="text-sm font-semibold">Document Viewer</span>
-              <Badge variant="secondary" className="text-[10px] font-medium">Free</Badge>
+              <ShieldCheck className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold">Secure Viewer</span>
+              <Badge variant="secondary" className="text-[10px] font-medium gap-1">
+                <Eye className="w-3 h-3" /> Free
+              </Badge>
             </div>
-            {viewData?.url && (
-              <a
-                href={viewData.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-muted-foreground hover:text-primary transition-colors underline underline-offset-2"
-              >
-                Open in new tab ↗
-              </a>
-            )}
+            <p className="text-xs text-muted-foreground hidden sm:block">
+              Content is protected · Copying and saving are disabled
+            </p>
           </div>
 
-          {/* Viewer body */}
-          {isLoadingView ? (
-            <div className="flex flex-col items-center justify-center h-[75vh] bg-muted/20 gap-4 text-muted-foreground">
-              <div className="w-10 h-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-              <p className="font-medium">Loading secure viewer…</p>
-            </div>
-          ) : isViewError || !viewData?.url ? (
-            <div className="flex flex-col items-center justify-center h-[50vh] text-center p-10 bg-muted/10">
-              <FileText className="w-16 h-16 text-muted-foreground opacity-30 mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Preview unavailable</h3>
-              <p className="text-muted-foreground max-w-sm text-sm leading-relaxed">
-                This file can't be previewed directly in the browser. Download it to view it on your device.
-              </p>
-              <Button className="mt-6 gap-2" onClick={handleDownloadClick}>
-                <Download className="w-4 h-4" /> Download to view
-              </Button>
-            </div>
-          ) : (
-            <div className="relative w-full" style={{ height: "80vh" }}>
-              <iframe
-                src={viewData.url}
-                className="absolute inset-0 w-full h-full border-none"
-                title={resource.name}
-                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-              />
-            </div>
-          )}
+          {/* The secure viewer — uses server-proxy, never raw storage URL */}
+          <SecureViewer
+            resourceId={resourceId}
+            resourceName={resource.name}
+            mimeType={resource.mimeType}
+            userEmail={user?.email}
+            userId={user?.id}
+          />
         </div>
       </div>
 
@@ -332,7 +312,6 @@ export default function ResourceDetail() {
             </DialogDescription>
           </DialogHeader>
 
-          {/* Units breakdown */}
           <div className="rounded-xl bg-muted/40 border border-border p-4 space-y-2 text-sm my-1">
             <div className="flex justify-between text-muted-foreground">
               <span>Your balance</span>

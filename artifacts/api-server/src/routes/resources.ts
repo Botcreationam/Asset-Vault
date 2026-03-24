@@ -25,6 +25,30 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
 
+// ── Rate limiter: max 60 streams per user per resource per hour ──────────────
+const streamAccessTracker = new Map<string, { count: number; resetAt: number }>();
+function checkStreamRateLimit(userId: string, resourceId: string): boolean {
+  const key = `${userId}:${resourceId}`;
+  const now = Date.now();
+  const windowMs = 60 * 60 * 1000;
+  const maxHits = 60;
+  const entry = streamAccessTracker.get(key);
+  if (!entry || now > entry.resetAt) {
+    streamAccessTracker.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (entry.count >= maxHits) return false;
+  entry.count++;
+  return true;
+}
+// Clean up old entries every 30 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of streamAccessTracker.entries()) {
+    if (now > entry.resetAt) streamAccessTracker.delete(key);
+  }
+}, 30 * 60 * 1000);
+
 function parseStoragePath(fullPath: string): { bucketName: string; objectName: string } {
   const path = fullPath.startsWith("/") ? fullPath : `/${fullPath}`;
   const parts = path.split("/");
@@ -289,6 +313,81 @@ router.get("/resources/:resourceId/view", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to get view URL");
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── Secure stream proxy (no raw GCS URL exposed to browser) ─────────────────
+router.get("/resources/:resourceId/stream", async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      res.status(401).send("Authentication required");
+      return;
+    }
+
+    const resourceId = req.params.resourceId;
+    if (!resourceId) {
+      res.status(400).send("Missing resource ID");
+      return;
+    }
+
+    // Rate limit: max 60 streams per user per resource per hour
+    if (!checkStreamRateLimit(req.user.id, resourceId)) {
+      res.status(429).send("Too many requests. Please try again later.");
+      return;
+    }
+
+    const [resource] = await db
+      .select()
+      .from(resourcesTable)
+      .where(and(eq(resourcesTable.id, resourceId), eq(resourcesTable.isActive, true)));
+
+    if (!resource) {
+      res.status(404).send("Resource not found");
+      return;
+    }
+
+    const { bucketName, objectName } = parseStoragePath(resource.storagePath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+
+    const [exists] = await file.exists();
+    if (!exists) {
+      res.status(404).send("File not found in storage");
+      return;
+    }
+
+    const [metadata] = await file.getMetadata();
+    const contentType = (metadata.contentType as string) || resource.mimeType || "application/octet-stream";
+
+    // Security headers — inline only, no download, no caching
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(resource.name)}"`);
+    res.setHeader("Cache-Control", "private, no-store, no-cache, must-revalidate");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    // Tell the browser not to offer a download button for this response
+    res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'none';");
+
+    if (metadata.size) {
+      res.setHeader("Content-Length", String(metadata.size));
+    }
+
+    // Increment view count (fire-and-forget)
+    db.update(resourcesTable)
+      .set({ viewCount: resource.viewCount + 1 })
+      .where(eq(resourcesTable.id, resource.id))
+      .catch(() => {});
+
+    // Stream file directly from GCS to the response
+    const readStream = file.createReadStream();
+    readStream.on("error", (err) => {
+      req.log.error({ err }, "Stream error");
+      if (!res.headersSent) res.status(500).send("Stream error");
+    });
+    readStream.pipe(res);
+  } catch (err) {
+    req.log.error({ err }, "Failed to stream resource");
+    if (!res.headersSent) res.status(500).send("Internal server error");
   }
 });
 
