@@ -14,7 +14,15 @@ import Account from "@/pages/account";
 import Admin from "@/pages/admin";
 import Search from "@/pages/search";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Auth role changes propagate immediately when user refocuses the window
+      refetchOnWindowFocus: true,
+      staleTime: 0,
+    },
+  },
+});
 
 function Router() {
   return (
