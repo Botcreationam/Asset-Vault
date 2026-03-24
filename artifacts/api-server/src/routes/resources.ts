@@ -17,12 +17,46 @@ import {
 import { eq, and, like, or } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import multer from "multer";
-import { ObjectStorageService } from "../lib/objectStorage";
+import { objectStorageClient } from "../lib/objectStorage";
 import { ensureUserUnits } from "./units";
 
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
-const storageService = new ObjectStorageService();
+
+const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+
+function parseStoragePath(fullPath: string): { bucketName: string; objectName: string } {
+  const path = fullPath.startsWith("/") ? fullPath : `/${fullPath}`;
+  const parts = path.split("/");
+  if (parts.length < 3) throw new Error("Invalid storage path");
+  return { bucketName: parts[1], objectName: parts.slice(2).join("/") };
+}
+
+function getPrivateDir(): string {
+  const dir = process.env.PRIVATE_OBJECT_DIR;
+  if (!dir) throw new Error("PRIVATE_OBJECT_DIR is not set");
+  return dir.replace(/\/$/, "");
+}
+
+async function getSignedUrl(bucketName: string, objectName: string, method: "GET" | "PUT", ttlSec: number): Promise<string> {
+  const response = await fetch(`${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      bucket_name: bucketName,
+      object_name: objectName,
+      method,
+      expires_at: new Date(Date.now() + ttlSec * 1000).toISOString(),
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Sidecar signing failed (${response.status}): ${text}`);
+  }
+  const { signed_url } = await response.json();
+  return signed_url;
+}
 
 function parseResourceRow(row: typeof resourcesTable.$inferSelect) {
   return {
@@ -52,7 +86,7 @@ router.get("/resources", async (req, res) => {
 
     const { folderId, search, type } = query.data;
 
-    let rows = await db.select().from(resourcesTable).where(
+    const rows = await db.select().from(resourcesTable).where(
       and(
         eq(resourcesTable.isActive, true),
         folderId ? eq(resourcesTable.folderId, folderId) : undefined,
@@ -88,11 +122,13 @@ router.post("/resources", upload.single("file"), async (req, res) => {
 
     const file = req.file;
     const objectId = randomUUID();
-    const ext = file.originalname.split(".").pop() || "";
-    const objectPath = `resources/${objectId}.${ext}`;
+    const ext = file.originalname.split(".").pop() || "bin";
+    const privateDir = getPrivateDir();
+    const fullPath = `${privateDir}/resources/${objectId}.${ext}`;
+    const { bucketName, objectName } = parseStoragePath(fullPath);
 
-    const bucket = (storageService as any).bucket;
-    const gcsFile = bucket.file(objectPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const gcsFile = bucket.file(objectName);
     await gcsFile.save(file.buffer, {
       metadata: { contentType: file.mimetype },
     });
@@ -106,7 +142,7 @@ router.post("/resources", upload.single("file"), async (req, res) => {
         description: description ?? null,
         type: type as any,
         folderId,
-        storagePath: objectPath,
+        storagePath: fullPath,
         fileSize: file.size,
         mimeType: file.mimetype,
         downloadCost: downloadCost ? parseInt(downloadCost, 10) : 5,
@@ -240,23 +276,16 @@ router.get("/resources/:resourceId/view", async (req, res) => {
       return;
     }
 
-    // Generate signed URL (valid for 60 minutes for viewing)
-    const bucket = (storageService as any).bucket;
-    const file = bucket.file(resource.storagePath);
+    const { bucketName, objectName } = parseStoragePath(resource.storagePath);
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-    const [signedUrl] = await file.getSignedUrl({
-      action: "read",
-      expires: expiresAt,
-      responseType: resource.mimeType ?? undefined,
-    });
+    const url = await getSignedUrl(bucketName, objectName, "GET", 3600);
 
-    // Increment view count
     await db
       .update(resourcesTable)
       .set({ viewCount: resource.viewCount + 1 })
       .where(eq(resourcesTable.id, resource.id));
 
-    res.json({ url: signedUrl, expiresAt: expiresAt.toISOString() });
+    res.json({ url, expiresAt: expiresAt.toISOString() });
   } catch (err) {
     req.log.error({ err }, "Failed to get view URL");
     res.status(500).json({ error: "Internal server error" });
@@ -318,18 +347,12 @@ router.post("/resources/:resourceId/download", async (req, res) => {
       .set({ downloadCount: resource.downloadCount + 1 })
       .where(eq(resourcesTable.id, resource.id));
 
-    // Generate signed download URL (15 min)
-    const bucket = (storageService as any).bucket;
-    const file = bucket.file(resource.storagePath);
+    const { bucketName, objectName } = parseStoragePath(resource.storagePath);
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    const [signedUrl] = await file.getSignedUrl({
-      action: "read",
-      expires: expiresAt,
-      responseDisposition: `attachment; filename="${resource.name}"`,
-    });
+    const url = await getSignedUrl(bucketName, objectName, "GET", 900);
 
     res.json({
-      url: signedUrl,
+      url,
       expiresAt: expiresAt.toISOString(),
       unitsSpent: cost,
       newBalance,
