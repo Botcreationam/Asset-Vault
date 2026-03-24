@@ -1,6 +1,7 @@
 import * as oidc from "openid-client";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import {
   clearSession,
   getOidcConfig,
@@ -49,11 +50,19 @@ function getSafeReturnTo(value: unknown): string {
   return value;
 }
 
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "frankmwalu04@gmail.com")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
 async function upsertUser(claims: Record<string, unknown>) {
+  const email = ((claims.email as string) || "").toLowerCase() || null;
+  const isAdmin = email && ADMIN_EMAILS.includes(email);
+
   const userData = {
     id: claims.sub as string,
     username: (claims.username as string) || null,
-    email: (claims.email as string) || null,
+    email: email || null,
     firstName: (claims.first_name as string) || null,
     lastName: (claims.last_name as string) || null,
     profileImageUrl: (claims.profile_image_url || claims.picture) as
@@ -61,13 +70,21 @@ async function upsertUser(claims: Record<string, unknown>) {
       | null,
   };
 
+  const [existing] = await db
+    .select({ id: usersTable.id, role: usersTable.role })
+    .from(usersTable)
+    .where(eq(usersTable.id, userData.id));
+
+  const role = isAdmin ? "admin" : (existing?.role ?? "student");
+
   const [user] = await db
     .insert(usersTable)
-    .values(userData)
+    .values({ ...userData, role })
     .onConflictDoUpdate({
       target: usersTable.id,
       set: {
         ...userData,
+        ...(isAdmin ? { role: "admin" } : {}),
         updatedAt: new Date(),
       },
     })
