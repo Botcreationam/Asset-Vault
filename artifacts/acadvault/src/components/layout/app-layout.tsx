@@ -1,6 +1,7 @@
 import { ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
+import { useTheme } from "@/hooks/use-theme";
 import { 
   BookOpen, 
   Compass, 
@@ -10,7 +11,9 @@ import {
   UserCircle, 
   Zap,
   Search,
-  Menu
+  Menu,
+  Sun,
+  Moon
 } from "lucide-react";
 import { 
   Sidebar, 
@@ -39,6 +42,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { user, isAuthenticated, login, logout } = useAuth();
   const [location, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  const { theme, toggleTheme } = useTheme();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -195,7 +199,17 @@ export function AppLayout({ children }: AppLayoutProps) {
               </form>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                className="rounded-full h-9 w-9 text-muted-foreground hover:text-foreground"
+                aria-label="Toggle dark mode"
+              >
+                {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </Button>
+
               {isAuthenticated && (
                 <Link href="/account">
                   <Badge variant="secondary" className="px-3 py-1.5 flex items-center gap-1.5 cursor-pointer hover:bg-secondary/80 transition-colors shadow-sm text-sm">

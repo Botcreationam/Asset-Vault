@@ -12,11 +12,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function SearchResults() {
   const searchString = useSearch();
-  const searchParams = new URLSearchParams(searchString);
-  const initialQuery = searchParams.get('q') || '';
-  
-  const [query, setQuery] = useState(initialQuery);
-  const [activeSearch, setActiveSearch] = useState(initialQuery);
+  const urlQuery = new URLSearchParams(searchString).get('q') || '';
+
+  const [query, setQuery] = useState(urlQuery);
+  const [activeSearch, setActiveSearch] = useState(urlQuery);
+
+  // Sync state whenever the URL query param changes (e.g. searching from header bar)
+  useEffect(() => {
+    setQuery(urlQuery);
+    setActiveSearch(urlQuery);
+  }, [urlQuery]);
 
   const { data, isLoading } = useListResources(
     { search: activeSearch },
@@ -27,8 +32,6 @@ export default function SearchResults() {
     e.preventDefault();
     if (query.trim()) {
       setActiveSearch(query.trim());
-      // Update URL without reload
-      window.history.replaceState(null, '', `/search?q=${encodeURIComponent(query.trim())}`);
     }
   };
 
