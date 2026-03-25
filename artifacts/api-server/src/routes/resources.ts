@@ -14,11 +14,12 @@ import {
   ViewResourceParams,
   DownloadResourceParams,
 } from "@workspace/api-zod";
-import { eq, and, like, or } from "drizzle-orm";
+import { eq, and, like, or, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import multer from "multer";
 import { objectStorageClient } from "../lib/objectStorage";
 import { ensureUserUnits } from "./units";
+import { logAudit } from "../lib/audit";
 
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
@@ -176,6 +177,13 @@ router.post("/resources", upload.single("file"), async (req, res) => {
       })
       .returning();
 
+    await logAudit("upload_resource", req.user.id, resourceId, {
+      name,
+      type,
+      folderId,
+      fileSize: file.size,
+    });
+
     res.status(201).json(parseResourceRow(resource));
   } catch (err) {
     req.log.error({ err }, "Failed to upload resource");
@@ -221,10 +229,15 @@ router.delete("/resources/:resourceId", async (req, res) => {
       return;
     }
 
-    await db
+    const [deleted] = await db
       .update(resourcesTable)
       .set({ isActive: false })
-      .where(eq(resourcesTable.id, params.data.resourceId));
+      .where(eq(resourcesTable.id, params.data.resourceId))
+      .returning({ name: resourcesTable.name });
+
+    await logAudit("delete_resource", req.user.id, params.data.resourceId, {
+      name: deleted?.name,
+    });
 
     res.json({ success: true });
   } catch (err) {
@@ -458,6 +471,30 @@ router.post("/resources/:resourceId/download", async (req, res) => {
     });
   } catch (err) {
     req.log.error({ err }, "Failed to process download");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── Admin: list all resources (including inactive) ───────────────────────────
+router.get("/admin/resources", async (req, res) => {
+  try {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      res.status(403).json({ error: "Admin access required" });
+      return;
+    }
+
+    const rows = await db
+      .select()
+      .from(resourcesTable)
+      .orderBy(desc(resourcesTable.createdAt))
+      .limit(500);
+
+    res.json({ resources: rows.map(parseResourceRow).map((r, i) => ({
+      ...r,
+      isActive: rows[i].isActive,
+    })) });
+  } catch (err) {
+    req.log.error({ err }, "Failed to list admin resources");
     res.status(500).json({ error: "Internal server error" });
   }
 });

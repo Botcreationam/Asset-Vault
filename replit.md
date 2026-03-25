@@ -48,6 +48,7 @@ artifacts-monorepo/
 - **resources** — Academic files (id, name, type, folderId, storagePath, fileSize, mimeType, downloadCost, tags, viewCount, downloadCount)
 - **user_units** — Unit balances per user
 - **units_transactions** — Transaction history (credit/debit)
+- **audit_logs** — Immutable audit trail (action, actorId, targetId, details, createdAt)
 
 ## Key Features
 

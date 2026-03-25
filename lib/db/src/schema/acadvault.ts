@@ -94,3 +94,26 @@ export const insertUserUnitsSchema = createInsertSchema(userUnitsTable).omit({
 });
 export type InsertUserUnits = z.infer<typeof insertUserUnitsSchema>;
 export type UserUnits = typeof userUnitsTable.$inferSelect;
+
+// ── Audit log ────────────────────────────────────────────────────────────────
+export const auditActionEnum = pgEnum("audit_action", [
+  "create_folder",
+  "delete_folder",
+  "upload_resource",
+  "delete_resource",
+  "update_resource",
+  "change_role",
+  "grant_units",
+  "profile_update",
+  "user_registered",
+  "units_welcome",
+]);
+
+export const auditLogsTable = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  action: auditActionEnum("action").notNull(),
+  actorId: text("actor_id").notNull(),
+  targetId: text("target_id"),
+  details: text("details"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});

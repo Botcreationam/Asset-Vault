@@ -1,6 +1,7 @@
 import * as oidc from "openid-client";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable } from "@workspace/db";
+import { userUnitsTable, unitsTransactionsTable, auditLogsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import {
   clearSession,
@@ -11,8 +12,11 @@ import {
   SESSION_TTL,
   type SessionData,
 } from "../lib/auth";
+import { logAudit } from "../lib/audit";
+import { z } from "zod";
 
 const OIDC_COOKIE_TTL = 10 * 60 * 1000;
+const WELCOME_UNITS = 50;
 
 const router: IRouter = Router();
 
@@ -55,6 +59,30 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "frankmwalu04@gmail.com")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
 
+/** Grant welcome units to a brand-new user. No-op if they already have a row. */
+async function grantWelcomeUnits(userId: string) {
+  const [existing] = await db
+    .select({ userId: userUnitsTable.userId })
+    .from(userUnitsTable)
+    .where(eq(userUnitsTable.userId, userId));
+
+  if (existing) return; // already onboarded
+
+  await db.insert(userUnitsTable).values({
+    userId,
+    balance: WELCOME_UNITS,
+  }).onConflictDoNothing();
+
+  await db.insert(unitsTransactionsTable).values({
+    userId,
+    type: "credit",
+    amount: WELCOME_UNITS,
+    description: `Welcome bonus — ${WELCOME_UNITS} free units to get you started`,
+  });
+
+  await logAudit("units_welcome", userId, userId, { amount: WELCOME_UNITS });
+}
+
 async function upsertUser(claims: Record<string, unknown>) {
   const email = ((claims.email as string) || "").toLowerCase() || null;
   const isAdmin = email && ADMIN_EMAILS.includes(email);
@@ -75,6 +103,7 @@ async function upsertUser(claims: Record<string, unknown>) {
     .from(usersTable)
     .where(eq(usersTable.id, userData.id));
 
+  const isNew = !existing;
   const role = isAdmin ? "admin" : (existing?.role ?? "student");
 
   const [user] = await db
@@ -89,6 +118,15 @@ async function upsertUser(claims: Record<string, unknown>) {
       },
     })
     .returning();
+
+  if (isNew) {
+    await grantWelcomeUnits(user.id);
+    await logAudit("user_registered", user.id, user.id, {
+      username: user.username,
+      role,
+    });
+  }
+
   return user;
 }
 
@@ -97,9 +135,6 @@ router.get("/auth/user", async (req: Request, res: Response) => {
     res.json({ authenticated: false });
     return;
   }
-
-  const { userUnitsTable } = await import("@workspace/db");
-  const { eq } = await import("drizzle-orm");
 
   const [unitsRow] = await db
     .select({ balance: userUnitsTable.balance })
@@ -113,6 +148,56 @@ router.get("/auth/user", async (req: Request, res: Response) => {
       unitsBalance: unitsRow?.balance ?? 0,
     },
   });
+});
+
+const UpdateProfileBody = z.object({
+  username: z.string().min(2).max(50).optional(),
+  firstName: z.string().min(1).max(50).optional(),
+  lastName: z.string().min(1).max(50).optional(),
+});
+
+router.patch("/auth/profile", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const body = UpdateProfileBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Invalid data", details: body.error.flatten() });
+    return;
+  }
+
+  const updates: Partial<{ username: string; firstName: string; lastName: string; updatedAt: Date }> = {
+    updatedAt: new Date(),
+  };
+  if (body.data.username !== undefined) updates.username = body.data.username;
+  if (body.data.firstName !== undefined) updates.firstName = body.data.firstName;
+  if (body.data.lastName !== undefined) updates.lastName = body.data.lastName;
+
+  // Check username uniqueness if being changed
+  if (body.data.username) {
+    const [taken] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.username, body.data.username));
+    if (taken && taken.id !== req.user.id) {
+      res.status(409).json({ error: "Username is already taken" });
+      return;
+    }
+  }
+
+  const [updated] = await db
+    .update(usersTable)
+    .set(updates)
+    .where(eq(usersTable.id, req.user.id))
+    .returning();
+
+  await logAudit("profile_update", req.user.id, req.user.id, {
+    fields: Object.keys(body.data),
+  });
+
+  res.json({ success: true, user: updated });
 });
 
 router.get("/login", async (req: Request, res: Response) => {
@@ -144,8 +229,6 @@ router.get("/login", async (req: Request, res: Response) => {
   res.redirect(redirectTo.href);
 });
 
-// Query params are not validated because the OIDC provider may include
-// parameters not expressed in the schema.
 router.get("/callback", async (req: Request, res: Response) => {
   const config = await getOidcConfig();
   const callbackUrl = `${getOrigin(req)}/api/callback`;
@@ -226,6 +309,5 @@ router.get("/logout", async (req: Request, res: Response) => {
 
   res.redirect(endSessionUrl.href);
 });
-
 
 export default router;

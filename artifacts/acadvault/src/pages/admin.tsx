@@ -1,28 +1,54 @@
 import { useState } from "react";
 import { AuthWrapper } from "@/components/auth-wrapper";
-import { 
-  useListFolders, 
-  useCreateFolder, 
-  useCreateResource, 
-  useAdminListUsers, 
-  useAdminUpdateUserRole, 
-  useAdminGrantUnits 
+import {
+  useListFolders,
+  useCreateFolder,
+  useCreateResource,
+  useAdminListUsers,
+  useAdminUpdateUserRole,
+  useAdminGrantUnits,
+  useDeleteFolder,
+  useDeleteResource,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useDropzone } from "react-dropzone";
-import { 
-  FolderPlus, UploadCloud, Users, Shield, Zap, Search, Plus
+import {
+  FolderPlus,
+  UploadCloud,
+  Users,
+  Shield,
+  Zap,
+  Trash2,
+  Pencil,
+  AlertTriangle,
+  ClipboardList,
+  FileText,
+  Folder,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -31,10 +57,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { BASE_URL } from "@/lib/api";
 
-// Form schemas
 const folderSchema = z.object({
   name: z.string().min(2, "Name is required"),
   description: z.string().optional(),
@@ -46,18 +74,47 @@ const grantUnitsSchema = z.object({
   description: z.string().min(3),
 });
 
+const ACTION_LABELS: Record<string, string> = {
+  create_folder: "Folder Created",
+  delete_folder: "Folder Deleted",
+  upload_resource: "File Uploaded",
+  delete_resource: "File Deleted",
+  update_resource: "File Updated",
+  change_role: "Role Changed",
+  grant_units: "Units Granted",
+  profile_update: "Profile Updated",
+  user_registered: "User Registered",
+  units_welcome: "Welcome Bonus",
+};
+
+const ACTION_COLORS: Record<string, string> = {
+  create_folder: "bg-blue-100 text-blue-700",
+  delete_folder: "bg-rose-100 text-rose-700",
+  upload_resource: "bg-green-100 text-green-700",
+  delete_resource: "bg-rose-100 text-rose-700",
+  update_resource: "bg-amber-100 text-amber-700",
+  change_role: "bg-violet-100 text-violet-700",
+  grant_units: "bg-yellow-100 text-yellow-700",
+  profile_update: "bg-cyan-100 text-cyan-700",
+  user_registered: "bg-emerald-100 text-emerald-700",
+  units_welcome: "bg-emerald-100 text-emerald-700",
+};
+
 export default function AdminDashboard() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const { data: usersData } = useAdminListUsers();
-  // Get all folders for dropdowns (we fetch without parentId, assuming API returns all or we need a specific endpoint. Assuming listFolders gets all if no parentId)
-  const { data: foldersData } = useListFolders(); 
+  const { data: foldersData, refetch: refetchFolders } = useListFolders();
 
   const updateRoleMutation = useAdminUpdateUserRole({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] })
-    }
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        toast({ title: "Role updated successfully" });
+      },
+    },
   });
 
   const handleRoleChange = (userId: string, newRole: "student" | "admin") => {
@@ -71,29 +128,49 @@ export default function AdminDashboard() {
           <h1 className="font-serif text-3xl font-bold text-foreground flex items-center gap-3">
             <Shield className="w-8 h-8 text-primary" /> Admin Portal
           </h1>
-          <p className="text-muted-foreground mt-2">Manage folders, resources, users, and platform settings.</p>
+          <p className="text-muted-foreground mt-2">
+            Full control over folders, resources, users, and platform activity.
+          </p>
         </div>
 
         <Tabs defaultValue="resources" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 max-w-md mb-8 h-12">
-            <TabsTrigger value="resources" className="text-base h-10">Uploads</TabsTrigger>
-            <TabsTrigger value="folders" className="text-base h-10">Folders</TabsTrigger>
-            <TabsTrigger value="users" className="text-base h-10">Users</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-5 max-w-2xl mb-8 h-12">
+            <TabsTrigger value="resources" className="text-sm h-10">
+              Upload
+            </TabsTrigger>
+            <TabsTrigger value="files" className="text-sm h-10">
+              Files
+            </TabsTrigger>
+            <TabsTrigger value="folders" className="text-sm h-10">
+              Folders
+            </TabsTrigger>
+            <TabsTrigger value="users" className="text-sm h-10">
+              Users
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="text-sm h-10">
+              Audit Log
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="resources" className="space-y-6">
             <ResourceUploadTab folders={foldersData?.folders || []} />
           </TabsContent>
 
+          <TabsContent value="files">
+            <FilesTab />
+          </TabsContent>
+
           <TabsContent value="folders">
-            <FoldersTab folders={foldersData?.folders || []} />
+            <FoldersTab folders={foldersData?.folders || []} refetch={refetchFolders} />
           </TabsContent>
 
           <TabsContent value="users">
             <Card className="border-border/60 shadow-sm">
               <CardHeader>
                 <CardTitle>User Management</CardTitle>
-                <CardDescription>Change roles and grant units to users</CardDescription>
+                <CardDescription>
+                  Change roles and grant units to users. New users automatically receive 50 free units.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -104,15 +181,21 @@ export default function AdminDashboard() {
                         <th className="px-4 py-3">Joined</th>
                         <th className="px-4 py-3">Balance</th>
                         <th className="px-4 py-3">Role</th>
-                        <th className="px-4 py-3 text-right rounded-tr-lg">Actions</th>
+                        <th className="px-4 py-3 text-right rounded-tr-lg">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/50">
-                      {usersData?.users?.map(u => (
+                      {usersData?.users?.map((u) => (
                         <tr key={u.id} className="hover:bg-muted/20">
                           <td className="px-4 py-4 font-medium text-foreground">
-                            {u.firstName ? `${u.firstName} ${u.lastName}` : u.username}
-                            <div className="text-xs text-muted-foreground font-normal">{u.username}</div>
+                            {u.firstName
+                              ? `${u.firstName} ${u.lastName}`
+                              : u.username}
+                            <div className="text-xs text-muted-foreground font-normal">
+                              {u.username}
+                            </div>
                           </td>
                           <td className="px-4 py-4 text-muted-foreground">
                             {format(new Date(u.createdAt), "MMM d, yyyy")}
@@ -121,9 +204,11 @@ export default function AdminDashboard() {
                             {u.unitsBalance}
                           </td>
                           <td className="px-4 py-4">
-                            <Select 
-                              defaultValue={u.role} 
-                              onValueChange={(v) => handleRoleChange(u.id, v as any)}
+                            <Select
+                              defaultValue={u.role}
+                              onValueChange={(v) =>
+                                handleRoleChange(u.id, v as any)
+                              }
                             >
                               <SelectTrigger className="w-[110px] h-8 text-xs">
                                 <SelectValue />
@@ -135,7 +220,10 @@ export default function AdminDashboard() {
                             </Select>
                           </td>
                           <td className="px-4 py-4 text-right">
-                            <GrantUnitsDialog userId={u.id} userName={u.username || 'User'} />
+                            <GrantUnitsDialog
+                              userId={u.id}
+                              userName={u.username || "User"}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -145,16 +233,21 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="audit">
+            <AuditLogTab />
+          </TabsContent>
         </Tabs>
       </div>
     </AuthWrapper>
   );
 }
 
-// --- SUB-COMPONENTS ---
+// ── Resource Upload ───────────────────────────────────────────────────────────
 
 function ResourceUploadTab({ folders }: { folders: any[] }) {
   const [file, setFile] = useState<File | null>(null);
+  const [formKey, setFormKey] = useState(0);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -163,24 +256,37 @@ function ResourceUploadTab({ folders }: { folders: any[] }) {
       onSuccess: () => {
         toast({ title: "Success", description: "Resource uploaded successfully" });
         setFile(null);
+        setFormKey((k) => k + 1);
         queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
-        // Need to reset form manually via state or ref in a real app, keeping it simple here
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/resources"] });
       },
       onError: (err: any) => {
-        toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
-      }
-    }
+        toast({
+          title: "Upload Failed",
+          description: err.message,
+          variant: "destructive",
+        });
+      },
+    },
   });
 
   const onDrop = (acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) setFile(acceptedFiles[0]);
   };
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, maxFiles: 1 });
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    maxFiles: 1,
+  });
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!file) return toast({ title: "Error", description: "Please select a file", variant: "destructive" });
-    
+    if (!file)
+      return toast({
+        title: "Error",
+        description: "Please select a file",
+        variant: "destructive",
+      });
+
     const fd = new FormData(e.currentTarget);
     createResourceMut.mutate({
       data: {
@@ -190,33 +296,45 @@ function ResourceUploadTab({ folders }: { folders: any[] }) {
         folderId: fd.get("folderId") as string,
         downloadCost: Number(fd.get("downloadCost")),
         tags: fd.get("tags") as string,
-        file: file
-      }
+        file: file,
+      },
     });
   };
 
   return (
     <Card className="border-border/60 shadow-sm max-w-3xl">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><UploadCloud className="w-5 h-5 text-primary" /> Upload New Resource</CardTitle>
-        <CardDescription>Add a new document, slide deck, or video to the library.</CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          <UploadCloud className="w-5 h-5 text-primary" /> Upload New Resource
+        </CardTitle>
+        <CardDescription>
+          Add a new document, slide deck, or video to the library.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={onSubmit} className="space-y-6">
-          <div 
-            {...getRootProps()} 
+        <form key={formKey} onSubmit={onSubmit} className="space-y-6">
+          <div
+            {...getRootProps()}
             className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
-              isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-muted/30"
+              isDragActive
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/50 hover:bg-muted/30"
             }`}
           >
             <input {...getInputProps()} />
             <UploadCloud className="w-10 h-10 mx-auto text-muted-foreground mb-4" />
             {file ? (
-              <div className="font-semibold text-primary">{file.name} ({(file.size/1024/1024).toFixed(2)} MB)</div>
+              <div className="font-semibold text-primary">
+                {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+              </div>
             ) : (
               <div>
-                <p className="font-medium text-foreground">Drag & drop a file here, or click to select</p>
-                <p className="text-sm text-muted-foreground mt-1">Supports PDF, PPTX, DOCX, MP4, etc.</p>
+                <p className="font-medium text-foreground">
+                  Drag & drop a file here, or click to select
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Supports PDF, PPTX, DOCX, MP4, etc.
+                </p>
               </div>
             )}
           </div>
@@ -224,13 +342,19 @@ function ResourceUploadTab({ folders }: { folders: any[] }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Resource Name *</label>
-              <Input name="name" required placeholder="e.g. Intro to Computer Science" />
+              <Input
+                name="name"
+                required
+                placeholder="e.g. Intro to Computer Science"
+              />
             </div>
-            
+
             <div className="space-y-2">
               <label className="text-sm font-medium">Resource Type *</label>
               <Select name="type" defaultValue="pdf" required>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pdf">PDF Document</SelectItem>
                   <SelectItem value="slides">Presentation / Slides</SelectItem>
@@ -245,27 +369,47 @@ function ResourceUploadTab({ folders }: { folders: any[] }) {
             <div className="space-y-2">
               <label className="text-sm font-medium">Destination Folder *</label>
               <Select name="folderId" required>
-                <SelectTrigger><SelectValue placeholder="Select folder" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select folder" />
+                </SelectTrigger>
                 <SelectContent>
-                  {folders?.map(f => (
-                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  {folders?.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Download Cost (Units) *</label>
-              <Input name="downloadCost" type="number" defaultValue="5" required min="0" />
+              <label className="text-sm font-medium">
+                Download Cost (Units) *
+              </label>
+              <Input
+                name="downloadCost"
+                type="number"
+                defaultValue="5"
+                required
+                min="0"
+              />
             </div>
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Description</label>
-            <Textarea name="description" placeholder="Brief description of this resource..." className="resize-none h-20" />
+            <Textarea
+              name="description"
+              placeholder="Brief description of this resource..."
+              className="resize-none h-20"
+            />
           </div>
 
-          <Button type="submit" disabled={createResourceMut.isPending || !file} className="w-full font-bold">
+          <Button
+            type="submit"
+            disabled={createResourceMut.isPending || !file}
+            className="w-full font-bold"
+          >
             {createResourceMut.isPending ? "Uploading..." : "Upload Resource"}
           </Button>
         </form>
@@ -274,110 +418,481 @@ function ResourceUploadTab({ folders }: { folders: any[] }) {
   );
 }
 
-function FoldersTab({ folders }: { folders: any[] }) {
-  const [isOpen, setIsOpen] = useState(false);
+// ── Files Tab ─────────────────────────────────────────────────────────────────
+
+function FilesTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteName, setDeleteName] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const [resources, setResources] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const fetchResources = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}api/admin/resources`, { credentials: "include" });
+      const data = await res.json();
+      setResources(data.resources || []);
+    } catch {
+      toast({ title: "Error loading files", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (resources === null && !loading) {
+    fetchResources();
+  }
+
+  const deleteResourceMut = useDeleteResource({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "File deleted successfully" });
+        setConfirmOpen(false);
+        setDeleteId(null);
+        fetchResources();
+        queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
+      },
+      onError: () => {
+        toast({ title: "Failed to delete file", variant: "destructive" });
+      },
+    },
+  });
+
+  const confirmDelete = (id: string, name: string) => {
+    setDeleteId(id);
+    setDeleteName(name);
+    setConfirmOpen(true);
+  };
+
+  const TYPE_COLORS: Record<string, string> = {
+    pdf: "bg-rose-100 text-rose-700",
+    slides: "bg-blue-100 text-blue-700",
+    notes: "bg-green-100 text-green-700",
+    book: "bg-violet-100 text-violet-700",
+    video: "bg-amber-100 text-amber-700",
+    other: "bg-gray-100 text-gray-700",
+  };
+
+  return (
+    <>
+      <Card className="border-border/60 shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-primary" /> All Files
+          </CardTitle>
+          <CardDescription>
+            Manage all uploaded resources across the platform.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="py-12 text-center text-muted-foreground">Loading files…</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs uppercase bg-muted/50 text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3 rounded-tl-lg">Name</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3">Cost</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Uploaded</th>
+                    <th className="px-4 py-3 text-right rounded-tr-lg">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {resources?.map((r) => (
+                    <tr key={r.id} className={`hover:bg-muted/20 ${!r.isActive ? "opacity-50" : ""}`}>
+                      <td className="px-4 py-3 font-medium text-foreground max-w-xs truncate">
+                        {r.name}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${TYPE_COLORS[r.type] || "bg-gray-100 text-gray-700"}`}>
+                          {r.type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-bold text-accent">{r.downloadCost}</td>
+                      <td className="px-4 py-3">
+                        {r.isActive ? (
+                          <span className="flex items-center gap-1 text-green-600 text-xs font-medium">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Active
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-rose-500 text-xs font-medium">
+                            <XCircle className="w-3.5 h-3.5" /> Deleted
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">
+                        {format(new Date(r.createdAt), "MMM d, yyyy")}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {r.isActive && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 h-7 px-2"
+                            onClick={() => confirmDelete(r.id, r.name)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {resources?.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
+                        No files found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-600">
+              <AlertTriangle className="w-5 h-5" /> Delete File
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>"{deleteName}"</strong>?
+              It will no longer be accessible to students. This action is logged.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 mt-2">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteResourceMut.isPending}
+              onClick={() => deleteId && deleteResourceMut.mutate({ resourceId: deleteId })}
+            >
+              {deleteResourceMut.isPending ? "Deleting…" : "Delete File"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+// ── Folders Tab ───────────────────────────────────────────────────────────────
+
+function FoldersTab({ folders, refetch }: { folders: any[]; refetch: () => void }) {
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editFolder, setEditFolder] = useState<any | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const form = useForm<z.infer<typeof folderSchema>>({
     resolver: zodResolver(folderSchema),
-    defaultValues: { parentId: "root" }
+    defaultValues: { parentId: "root" },
+  });
+
+  const editForm = useForm<{ name: string; description: string }>({
+    defaultValues: { name: "", description: "" },
   });
 
   const createFolderMut = useCreateFolder({
     mutation: {
       onSuccess: () => {
         toast({ title: "Folder Created" });
-        setIsOpen(false);
-        form.reset();
+        setIsCreateOpen(false);
+        form.reset({ parentId: "root" });
         queryClient.invalidateQueries({ queryKey: ["/api/folders"] });
-      }
-    }
+      },
+    },
   });
 
+  const deleteFolderMut = useDeleteFolder({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Folder deleted", description: "All contents were removed." });
+        setDeleteTarget(null);
+        queryClient.invalidateQueries({ queryKey: ["/api/folders"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/resources"] });
+      },
+      onError: () => {
+        toast({ title: "Failed to delete folder", variant: "destructive" });
+      },
+    },
+  });
+
+  const handleRename = async (folder: any, data: { name: string; description: string }) => {
+    try {
+      const res = await fetch(`${BASE_URL}api/folders/${folder.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast({ title: "Folder renamed successfully" });
+      setEditFolder(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/folders"] });
+    } catch {
+      toast({ title: "Failed to rename folder", variant: "destructive" });
+    }
+  };
+
   return (
-    <Card className="border-border/60 shadow-sm max-w-3xl">
-      <CardHeader className="flex flex-row justify-between items-center">
-        <div>
-          <CardTitle>Folder Structure</CardTitle>
-          <CardDescription>Organize resources hierarchically.</CardDescription>
-        </div>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-2"><FolderPlus className="w-4 h-4" /> New Folder</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create Folder</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={form.handleSubmit((d) => createFolderMut.mutate({ data: { ...d, parentId: d.parentId === 'root' ? undefined : d.parentId } }))} className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Name</label>
-                <Input {...form.register("name")} placeholder="e.g. Year 1, Computer Science..." />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Parent Folder</label>
-                <Select onValueChange={(v) => form.setValue("parentId", v)} defaultValue="root">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="root">-- Root Level --</SelectItem>
-                    {folders?.map(f => (
-                      <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button type="submit" className="w-full mt-4" disabled={createFolderMut.isPending}>
-                Create Folder
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </CardHeader>
-      <CardContent>
-        <div className="bg-muted/30 rounded-xl p-4 border border-border/50">
-          {folders?.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">No folders created yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {folders?.map(f => (
-                <li key={f.id} className="flex items-center justify-between p-3 bg-card rounded-lg border border-border/60 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <FolderPlus className="w-5 h-5 text-primary/60" />
-                    <span className="font-medium">{f.name}</span>
+    <>
+      <Card className="border-border/60 shadow-sm max-w-3xl">
+        <CardHeader className="flex flex-row justify-between items-center">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Folder className="w-5 h-5 text-primary" /> Folder Management
+            </CardTitle>
+            <CardDescription>
+              Create, rename, and delete folders. Deleting a folder removes all its
+              contents permanently.
+            </CardDescription>
+          </div>
+          <Button size="sm" className="gap-2" onClick={() => setIsCreateOpen(true)}>
+            <FolderPlus className="w-4 h-4" /> New Folder
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-xl border border-border/50 divide-y divide-border/50 overflow-hidden">
+            {folders?.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">
+                No folders yet. Create one to get started.
+              </p>
+            ) : (
+              folders?.map((f) => (
+                <div
+                  key={f.id}
+                  className="flex items-center justify-between px-4 py-3 bg-card hover:bg-muted/20 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <FolderPlus className="w-4 h-4 text-primary/60 shrink-0" />
+                    <div className="min-w-0">
+                      <span className="font-medium block truncate">{f.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {f.resourceCount} file{f.resourceCount !== 1 ? "s" : ""} ·{" "}
+                        {f.subfolderCount} subfolder{f.subfolderCount !== 1 ? "s" : ""}
+                      </span>
+                    </div>
                   </div>
-                  <Badge variant="secondary" className="text-xs">{f.level === 0 ? 'Root' : `Nested`}</Badge>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+                  <div className="flex items-center gap-2 shrink-0 ml-4">
+                    <Badge variant="secondary" className="text-xs hidden sm:inline-flex">
+                      {f.level === 0 ? "Root" : `Level ${f.level}`}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setEditFolder(f);
+                        editForm.reset({ name: f.name, description: f.description || "" });
+                      }}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-rose-400 hover:text-rose-600 hover:bg-rose-50"
+                      onClick={() => setDeleteTarget(f)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Create Dialog */}
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Folder</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={form.handleSubmit((d) =>
+              createFolderMut.mutate({
+                data: {
+                  ...d,
+                  parentId: d.parentId === "root" ? undefined : d.parentId,
+                },
+              })
+            )}
+            className="space-y-4 pt-4"
+          >
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Name</label>
+              <Input
+                {...form.register("name")}
+                placeholder="e.g. Year 1, Computer Science..."
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Description (optional)</label>
+              <Input
+                {...form.register("description")}
+                placeholder="Brief description..."
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Parent Folder</label>
+              <Select
+                onValueChange={(v) => form.setValue("parentId", v)}
+                defaultValue="root"
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="root">-- Root Level --</SelectItem>
+                  {folders?.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              type="submit"
+              className="w-full mt-4"
+              disabled={createFolderMut.isPending}
+            >
+              Create Folder
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Dialog */}
+      <Dialog open={!!editFolder} onOpenChange={(o) => !o && setEditFolder(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Folder</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={editForm.handleSubmit((d) => handleRename(editFolder, d))}
+            className="space-y-4 pt-4"
+          >
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Name</label>
+              <Input {...editForm.register("name")} required />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Description</label>
+              <Input {...editForm.register("description")} />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setEditFolder(null)}>
+                Cancel
+              </Button>
+              <Button type="submit">Save Changes</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-600">
+              <AlertTriangle className="w-5 h-5" /> Delete Folder
+            </DialogTitle>
+            <DialogDescription className="space-y-2 pt-2">
+              <p>
+                You are about to permanently delete{" "}
+                <strong>"{deleteTarget?.name}"</strong>.
+              </p>
+              {(deleteTarget?.resourceCount > 0 || deleteTarget?.subfolderCount > 0) && (
+                <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 text-sm text-rose-700">
+                  <AlertTriangle className="w-4 h-4 inline mr-1" />
+                  This folder contains{" "}
+                  <strong>{deleteTarget?.resourceCount} file(s)</strong> and{" "}
+                  <strong>{deleteTarget?.subfolderCount} subfolder(s)</strong> which will
+                  all be permanently removed.
+                </div>
+              )}
+              <p className="text-muted-foreground text-sm">This action cannot be undone.</p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteFolderMut.isPending}
+              onClick={() =>
+                deleteTarget &&
+                deleteFolderMut.mutate({ folderId: deleteTarget.id })
+              }
+            >
+              {deleteFolderMut.isPending ? "Deleting…" : "Delete Everything"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
-function GrantUnitsDialog({ userId, userName }: { userId: string, userName: string }) {
+// ── Grant Units Dialog ────────────────────────────────────────────────────────
+
+function GrantUnitsDialog({
+  userId,
+  userName,
+}: {
+  userId: string;
+  userName: string;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const form = useForm<z.infer<typeof grantUnitsSchema>>({ resolver: zodResolver(grantUnitsSchema) });
+  const form = useForm<z.infer<typeof grantUnitsSchema>>({
+    resolver: zodResolver(grantUnitsSchema),
+  });
 
   const mut = useAdminGrantUnits({
     mutation: {
       onSuccess: () => {
-        toast({ title: "Units Granted", description: `Successfully granted to ${userName}` });
+        toast({
+          title: "Units Granted",
+          description: `Successfully granted to ${userName}`,
+        });
         setIsOpen(false);
         form.reset();
         queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      }
-    }
+      },
+    },
   });
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="gap-1 border-accent/30 text-accent hover:bg-accent/10 hover:text-accent-foreground h-8 px-2 text-xs">
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1 border-accent/30 text-accent hover:bg-accent/10 hover:text-accent-foreground h-8 px-2 text-xs"
+        >
           <Zap className="w-3 h-3" /> Grant
         </Button>
       </DialogTrigger>
@@ -385,20 +900,129 @@ function GrantUnitsDialog({ userId, userName }: { userId: string, userName: stri
         <DialogHeader>
           <DialogTitle>Grant Units to {userName}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={form.handleSubmit((d) => mut.mutate({ userId, data: d }))} className="space-y-4 pt-4">
+        <form
+          onSubmit={form.handleSubmit((d) => mut.mutate({ userId, data: d }))}
+          className="space-y-4 pt-4"
+        >
           <div className="space-y-2">
             <label className="text-sm font-medium">Amount</label>
-            <Input type="number" {...form.register("amount")} placeholder="e.g. 50" />
+            <Input
+              type="number"
+              {...form.register("amount")}
+              placeholder="e.g. 50"
+            />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Description (Reason)</label>
-            <Input {...form.register("description")} placeholder="e.g. Reward for contribution" />
+            <Input
+              {...form.register("description")}
+              placeholder="e.g. Reward for contribution"
+            />
           </div>
-          <Button type="submit" className="w-full mt-4" disabled={mut.isPending}>
+          <Button
+            type="submit"
+            className="w-full mt-4"
+            disabled={mut.isPending}
+          >
             Confirm Grant
           </Button>
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ── Audit Log Tab ─────────────────────────────────────────────────────────────
+
+function AuditLogTab() {
+  const [logs, setLogs] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const fetchLogs = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}api/admin/audit-logs`, { credentials: "include" });
+      const data = await res.json();
+      setLogs(data.logs || []);
+    } catch {
+      toast({ title: "Error loading audit logs", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (logs === null && !loading) fetchLogs();
+
+  return (
+    <Card className="border-border/60 shadow-sm">
+      <CardHeader className="flex flex-row justify-between items-center">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <ClipboardList className="w-5 h-5 text-primary" /> Audit Log
+          </CardTitle>
+          <CardDescription>
+            All critical actions are recorded here for accountability.
+          </CardDescription>
+        </div>
+        <Button variant="outline" size="sm" onClick={fetchLogs} disabled={loading}>
+          Refresh
+        </Button>
+      </CardHeader>
+      <CardContent className="p-0">
+        {loading ? (
+          <div className="py-12 text-center text-muted-foreground">Loading…</div>
+        ) : logs?.length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground">
+            No activity recorded yet.
+          </div>
+        ) : (
+          <div className="divide-y divide-border/50">
+            {logs?.map((log) => {
+              const actor =
+                log.actorFirstName
+                  ? `${log.actorFirstName} ${log.actorLastName || ""}`.trim()
+                  : log.actorUsername || log.actorId;
+              let details: Record<string, unknown> = {};
+              try {
+                details = log.details ? JSON.parse(log.details) : {};
+              } catch {}
+              return (
+                <div
+                  key={log.id}
+                  className="px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 hover:bg-muted/20"
+                >
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`text-xs font-semibold px-2 py-1 rounded-full shrink-0 ${
+                        ACTION_COLORS[log.action] || "bg-gray-100 text-gray-700"
+                      }`}
+                    >
+                      {ACTION_LABELS[log.action] || log.action}
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {actor}
+                      </p>
+                      {Object.keys(details).length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {Object.entries(details)
+                            .filter(([k]) => k !== "cascadeIds")
+                            .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+                            .join(" · ")}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {format(new Date(log.createdAt), "MMM d, yyyy · h:mm a")}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

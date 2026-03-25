@@ -4,6 +4,7 @@ import {
   userUnitsTable,
   unitsTransactionsTable,
   usersTable,
+  auditLogsTable,
 } from "@workspace/db/schema";
 import {
   TopUpUnitsBody,
@@ -13,6 +14,7 @@ import {
   AdminUpdateUserRoleParams,
 } from "@workspace/api-zod";
 import { eq, desc } from "drizzle-orm";
+import { logAudit } from "../lib/audit";
 
 const router: IRouter = Router();
 
@@ -177,6 +179,10 @@ router.patch("/admin/users/:userId/role", async (req, res) => {
       return;
     }
 
+    await logAudit("change_role", req.user.id, updated.id, {
+      newRole: body.data.role,
+    });
+
     const balance = await ensureUserUnits(updated.id);
     res.json({ ...updated, unitsBalance: balance, downloadCount: 0 });
   } catch (err) {
@@ -223,9 +229,46 @@ router.post("/admin/users/:userId/units", async (req, res) => {
       description: description ?? `Admin granted ${amount} units`,
     });
 
+    await logAudit("grant_units", req.user.id, params.data.userId, {
+      amount,
+      description,
+    });
+
     res.json({ balance: newBalance });
   } catch (err) {
     req.log.error({ err }, "Failed to grant units");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── Admin: list audit logs ────────────────────────────────────────────────────
+router.get("/admin/audit-logs", async (req, res) => {
+  try {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      res.status(403).json({ error: "Admin access required" });
+      return;
+    }
+
+    const logs = await db
+      .select({
+        id: auditLogsTable.id,
+        action: auditLogsTable.action,
+        actorId: auditLogsTable.actorId,
+        targetId: auditLogsTable.targetId,
+        details: auditLogsTable.details,
+        createdAt: auditLogsTable.createdAt,
+        actorUsername: usersTable.username,
+        actorFirstName: usersTable.firstName,
+        actorLastName: usersTable.lastName,
+      })
+      .from(auditLogsTable)
+      .leftJoin(usersTable, eq(auditLogsTable.actorId, usersTable.id))
+      .orderBy(desc(auditLogsTable.createdAt))
+      .limit(200);
+
+    res.json({ logs });
+  } catch (err) {
+    req.log.error({ err }, "Failed to get audit logs");
     res.status(500).json({ error: "Internal server error" });
   }
 });
