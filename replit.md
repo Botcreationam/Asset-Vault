@@ -27,7 +27,8 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 artifacts-monorepo/
 ├── artifacts/
 │   ├── api-server/         # Express API server
-│   └── acadvault/          # React + Vite frontend
+│   ├── acadvault/          # React + Vite frontend
+│   └── acadvault-mobile/   # Expo React Native mobile app
 ├── lib/
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
@@ -155,6 +156,18 @@ React + Vite frontend. Pages in `src/pages/`:
 - `admin.tsx` — admin dashboard: folders, upload resources, manage users
 - `hooks/use-websocket.ts` — shared singleton WebSocket client with auto-reconnect
 
+### `artifacts/acadvault-mobile` (`@workspace/acadvault-mobile`)
+
+Expo React Native mobile app. Connects to the same API server as the web frontend.
+
+- **Font**: Plus Jakarta Sans (matching web app)
+- **Design tokens**: Synced from web CSS (navy blue/gold academic theme)
+- **Auth**: Uses `expo-web-browser` for Replit Auth login flow; checks `/api/auth/user` for session
+- **Navigation**: 4 tabs — Library (folder browser), Search, Feed (social posts), Account (profile + balance)
+- **Resource detail**: Stack screen at `/resource/[id]` with view-free + paid-download actions
+- **API connection**: `setBaseUrl` from `@workspace/api-client-react` with `EXPO_PUBLIC_DOMAIN` env var
+- **CORS**: API server allows `REPLIT_EXPO_DEV_DOMAIN` origin for cross-domain mobile web preview
+
 ### `lib/db` (`@workspace/db`)
 
 Push schema: `pnpm --filter @workspace/db run push`
@@ -165,8 +178,9 @@ Run codegen: `pnpm --filter @workspace/api-spec run codegen`
 
 ## Development
 
-- `pnpm --filter @workspace/api-server run dev` — API server
-- `pnpm --filter @workspace/acadvault run dev` — frontend
+- `pnpm --filter @workspace/api-server run dev` — API server (port 8080)
+- `pnpm --filter @workspace/acadvault run dev` — web frontend (port 22689)
+- `pnpm --filter @workspace/acadvault-mobile run dev` — mobile app (port 20808)
 
 ## Admin Setup
 

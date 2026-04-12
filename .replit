@@ -15,6 +15,7 @@ args = ["pnpm", "store", "prune"]
 env = { "CI" = "true" }
 
 [workflows]
+runButton = "Project"
 
 [agent]
 stack = "PNPM_WORKSPACE"
@@ -26,3 +27,8 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.development]
+EXPO_PUBLIC_DOMAIN = "313a1de7-7786-45a3-a57b-ae471f05c147-00-35whqx513ynb8.riker.replit.dev"
