@@ -19,6 +19,10 @@ tags:
     description: Units / credits management
   - name: admin
     description: Admin operations
+  - name: social
+    description: Social feed (posts, comments, reactions)
+  - name: chat
+    description: Real-time messaging
 paths:
   /healthz:
     get:
@@ -368,6 +372,249 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnitsBalanceResponse"
+
+  /auth/profile-photo:
+    post:
+      operationId: uploadProfilePhoto
+      tags: [auth]
+      summary: Upload a profile photo
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photo:
+                  type: string
+                  format: binary
+              required:
+                - photo
+      responses:
+        "200":
+          description: Updated profile image URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfilePhotoResponse"
+
+  /social/posts:
+    get:
+      operationId: listPosts
+      tags: [social]
+      summary: Get the news feed
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: List of posts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostListResponse"
+    post:
+      operationId: createPost
+      tags: [social]
+      summary: Create a new post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostBody"
+      responses:
+        "201":
+          description: Created post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+
+  /social/posts/{postId}:
+    delete:
+      operationId: deletePost
+      tags: [social]
+      summary: Delete own post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /social/posts/{postId}/comments:
+    get:
+      operationId: listComments
+      tags: [social]
+      summary: Get comments for a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentListResponse"
+    post:
+      operationId: createComment
+      tags: [social]
+      summary: Add a comment to a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentBody"
+      responses:
+        "201":
+          description: Created comment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+
+  /social/posts/{postId}/react:
+    post:
+      operationId: toggleReaction
+      tags: [social]
+      summary: Like or unlike a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Reaction toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReactionResponse"
+
+  /chat/conversations:
+    get:
+      operationId: listConversations
+      tags: [chat]
+      summary: Get user's conversations
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationListResponse"
+    post:
+      operationId: createConversation
+      tags: [chat]
+      summary: Start a conversation with another user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateConversationBody"
+      responses:
+        "201":
+          description: Conversation created or existing returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+
+  /chat/conversations/{conversationId}/messages:
+    get:
+      operationId: listMessages
+      tags: [chat]
+      summary: Get messages in a conversation
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageListResponse"
+    post:
+      operationId: sendMessage
+      tags: [chat]
+      summary: Send a message in a conversation
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageBody"
+      responses:
+        "201":
+          description: Sent message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  /chat/users:
+    get:
+      operationId: listChatUsers
+      tags: [chat]
+      summary: List users available to chat with
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatUserListResponse"
 
   /folder-path/{folderId}:
     get:
@@ -731,3 +978,231 @@ components:
           type: boolean
       required:
         - success
+
+    ProfilePhotoResponse:
+      type: object
+      properties:
+        profileImageUrl:
+          type: string
+      required:
+        - profileImageUrl
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: integer
+        content:
+          type: string
+        imageUrl:
+          type: string
+        likesCount:
+          type: integer
+        commentsCount:
+          type: integer
+        liked:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        author:
+          $ref: "#/components/schemas/PostAuthor"
+      required:
+        - id
+        - content
+        - likesCount
+        - commentsCount
+        - liked
+        - createdAt
+        - author
+
+    PostAuthor:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        profileImageUrl:
+          type: string
+      required:
+        - id
+
+    PostListResponse:
+      type: object
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Post"
+        nextCursor:
+          type: integer
+      required:
+        - posts
+
+    CreatePostBody:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+        postId:
+          type: integer
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        author:
+          $ref: "#/components/schemas/PostAuthor"
+      required:
+        - id
+        - postId
+        - content
+        - createdAt
+        - author
+
+    CommentListResponse:
+      type: object
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Comment"
+      required:
+        - comments
+
+    CreateCommentBody:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
+
+    ReactionResponse:
+      type: object
+      properties:
+        liked:
+          type: boolean
+        likesCount:
+          type: integer
+      required:
+        - liked
+        - likesCount
+
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: integer
+        participant:
+          $ref: "#/components/schemas/PostAuthor"
+        lastMessage:
+          $ref: "#/components/schemas/Message"
+        unreadCount:
+          type: integer
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - participant
+        - unreadCount
+        - updatedAt
+
+    ConversationListResponse:
+      type: object
+      properties:
+        conversations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Conversation"
+      required:
+        - conversations
+
+    CreateConversationBody:
+      type: object
+      properties:
+        userId:
+          type: string
+      required:
+        - userId
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+        conversationId:
+          type: integer
+        senderId:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - conversationId
+        - senderId
+        - content
+        - createdAt
+
+    MessageListResponse:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        nextCursor:
+          type: integer
+      required:
+        - messages
+
+    SendMessageBody:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
+
+    ChatUser:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        profileImageUrl:
+          type: string
+      required:
+        - id
+
+    ChatUserListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatUser"
+      required:
+        - users

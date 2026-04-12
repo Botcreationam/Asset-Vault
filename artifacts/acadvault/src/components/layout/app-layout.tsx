@@ -13,7 +13,9 @@ import {
   Search,
   Menu,
   Sun,
-  Moon
+  Moon,
+  Newspaper,
+  MessageSquare,
 } from "lucide-react";
 import { 
   Sidebar, 
@@ -55,6 +57,11 @@ export function AppLayout({ children }: AppLayoutProps) {
     { title: "Home", url: "/", icon: Compass },
     { title: "Browse Library", url: "/browse", icon: BookOpen },
     { title: "Advanced Search", url: "/search", icon: FolderSearch },
+  ];
+
+  const socialItems = [
+    { title: "News Feed", url: "/feed", icon: Newspaper },
+    { title: "Messages", url: "/chat", icon: MessageSquare },
   ];
 
   const userItems = [
@@ -106,6 +113,28 @@ export function AppLayout({ children }: AppLayoutProps) {
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
+
+            {isAuthenticated && (
+              <SidebarGroup className="mt-4">
+                <SidebarGroupLabel className="text-xs font-semibold tracking-wider uppercase text-sidebar-foreground/50">
+                  Community
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {socialItems.map((item) => (
+                      <SidebarMenuItem key={item.url}>
+                        <SidebarMenuButton asChild isActive={location.startsWith(item.url)}>
+                          <Link href={item.url} className="flex items-center gap-3 transition-colors">
+                            <item.icon className="w-4 h-4" />
+                            <span className="font-medium">{item.title}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
 
             {isAuthenticated && (
               <SidebarGroup className="mt-4">

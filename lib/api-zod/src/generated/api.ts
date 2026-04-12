@@ -322,6 +322,204 @@ export const AdminGrantUnitsResponse = zod.object({
 });
 
 /**
+ * @summary Upload a profile photo
+ */
+export const UploadProfilePhotoBody = zod.object({
+  photo: zod.instanceof(File),
+});
+
+export const UploadProfilePhotoResponse = zod.object({
+  profileImageUrl: zod.string(),
+});
+
+/**
+ * @summary Get the news feed
+ */
+export const listPostsQueryLimitDefault = 20;
+
+export const ListPostsQueryParams = zod.object({
+  cursor: zod.coerce.number().optional(),
+  limit: zod.coerce.number().default(listPostsQueryLimitDefault),
+});
+
+export const ListPostsResponse = zod.object({
+  posts: zod.array(
+    zod.object({
+      id: zod.number(),
+      content: zod.string(),
+      imageUrl: zod.string().optional(),
+      likesCount: zod.number(),
+      commentsCount: zod.number(),
+      liked: zod.boolean(),
+      createdAt: zod.date(),
+      author: zod.object({
+        id: zod.string(),
+        username: zod.string().optional(),
+        firstName: zod.string().optional(),
+        lastName: zod.string().optional(),
+        profileImageUrl: zod.string().optional(),
+      }),
+    }),
+  ),
+  nextCursor: zod.number().optional(),
+});
+
+/**
+ * @summary Create a new post
+ */
+export const CreatePostBody = zod.object({
+  content: zod.string(),
+});
+
+/**
+ * @summary Delete own post
+ */
+export const DeletePostParams = zod.object({
+  postId: zod.coerce.number(),
+});
+
+export const DeletePostResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
+ * @summary Get comments for a post
+ */
+export const ListCommentsParams = zod.object({
+  postId: zod.coerce.number(),
+});
+
+export const ListCommentsResponse = zod.object({
+  comments: zod.array(
+    zod.object({
+      id: zod.number(),
+      postId: zod.number(),
+      content: zod.string(),
+      createdAt: zod.date(),
+      author: zod.object({
+        id: zod.string(),
+        username: zod.string().optional(),
+        firstName: zod.string().optional(),
+        lastName: zod.string().optional(),
+        profileImageUrl: zod.string().optional(),
+      }),
+    }),
+  ),
+});
+
+/**
+ * @summary Add a comment to a post
+ */
+export const CreateCommentParams = zod.object({
+  postId: zod.coerce.number(),
+});
+
+export const CreateCommentBody = zod.object({
+  content: zod.string(),
+});
+
+/**
+ * @summary Like or unlike a post
+ */
+export const ToggleReactionParams = zod.object({
+  postId: zod.coerce.number(),
+});
+
+export const ToggleReactionResponse = zod.object({
+  liked: zod.boolean(),
+  likesCount: zod.number(),
+});
+
+/**
+ * @summary Get user's conversations
+ */
+export const ListConversationsResponse = zod.object({
+  conversations: zod.array(
+    zod.object({
+      id: zod.number(),
+      participant: zod.object({
+        id: zod.string(),
+        username: zod.string().optional(),
+        firstName: zod.string().optional(),
+        lastName: zod.string().optional(),
+        profileImageUrl: zod.string().optional(),
+      }),
+      lastMessage: zod
+        .object({
+          id: zod.number(),
+          conversationId: zod.number(),
+          senderId: zod.string(),
+          content: zod.string(),
+          createdAt: zod.date(),
+        })
+        .optional(),
+      unreadCount: zod.number(),
+      updatedAt: zod.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Start a conversation with another user
+ */
+export const CreateConversationBody = zod.object({
+  userId: zod.string(),
+});
+
+/**
+ * @summary Get messages in a conversation
+ */
+export const ListMessagesParams = zod.object({
+  conversationId: zod.coerce.number(),
+});
+
+export const listMessagesQueryLimitDefault = 50;
+
+export const ListMessagesQueryParams = zod.object({
+  cursor: zod.coerce.number().optional(),
+  limit: zod.coerce.number().default(listMessagesQueryLimitDefault),
+});
+
+export const ListMessagesResponse = zod.object({
+  messages: zod.array(
+    zod.object({
+      id: zod.number(),
+      conversationId: zod.number(),
+      senderId: zod.string(),
+      content: zod.string(),
+      createdAt: zod.date(),
+    }),
+  ),
+  nextCursor: zod.number().optional(),
+});
+
+/**
+ * @summary Send a message in a conversation
+ */
+export const SendMessageParams = zod.object({
+  conversationId: zod.coerce.number(),
+});
+
+export const SendMessageBody = zod.object({
+  content: zod.string(),
+});
+
+/**
+ * @summary List users available to chat with
+ */
+export const ListChatUsersResponse = zod.object({
+  users: zod.array(
+    zod.object({
+      id: zod.string(),
+      username: zod.string().optional(),
+      firstName: zod.string().optional(),
+      lastName: zod.string().optional(),
+      profileImageUrl: zod.string().optional(),
+    }),
+  ),
+});
+
+/**
  * @summary Get breadcrumb path for a folder
  */
 export const GetFolderPathParams = zod.object({

@@ -6,6 +6,7 @@ import {
   timestamp,
   pgEnum,
   boolean,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -115,5 +116,61 @@ export const auditLogsTable = pgTable("audit_logs", {
   actorId: text("actor_id").notNull(),
   targetId: text("target_id"),
   details: text("details"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const postsTable = pgTable("posts", {
+  id: serial("id").primaryKey(),
+  authorId: text("author_id").notNull(),
+  content: text("content").notNull(),
+  imageUrl: text("image_url"),
+  likesCount: integer("likes_count").notNull().default(0),
+  commentsCount: integer("comments_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const postCommentsTable = pgTable("post_comments", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").notNull(),
+  authorId: text("author_id").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const postReactionsTable = pgTable(
+  "post_reactions",
+  {
+    id: serial("id").primaryKey(),
+    postId: integer("post_id").notNull(),
+    userId: text("user_id").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("post_reactions_post_user_idx").on(table.postId, table.userId)],
+);
+
+export const conversationsTable = pgTable("conversations", {
+  id: serial("id").primaryKey(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const conversationParticipantsTable = pgTable(
+  "conversation_participants",
+  {
+    id: serial("id").primaryKey(),
+    conversationId: integer("conversation_id").notNull(),
+    userId: text("user_id").notNull(),
+    lastReadAt: timestamp("last_read_at"),
+    joinedAt: timestamp("joined_at").notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("conv_participant_idx").on(table.conversationId, table.userId)],
+);
+
+export const messagesTable = pgTable("messages", {
+  id: serial("id").primaryKey(),
+  conversationId: integer("conversation_id").notNull(),
+  senderId: text("sender_id").notNull(),
+  content: text("content").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

@@ -49,6 +49,12 @@ artifacts-monorepo/
 - **user_units** — Unit balances per user
 - **units_transactions** — Transaction history (credit/debit)
 - **audit_logs** — Immutable audit trail (action, actorId, targetId, details, createdAt)
+- **posts** — Social feed posts (id, authorId, content, imageUrl, likesCount, commentsCount, createdAt)
+- **post_comments** — Comments on posts (id, postId, authorId, content, createdAt)
+- **post_reactions** — Like reactions on posts (id, postId, userId, createdAt; unique per user+post)
+- **conversations** — Chat conversations (id, name, isGroup, createdAt)
+- **conversation_participants** — Users in a conversation (id, conversationId, userId, joinedAt)
+- **messages** — Chat messages (id, conversationId, senderId, content, createdAt)
 
 ## Key Features
 
@@ -58,6 +64,9 @@ artifacts-monorepo/
 4. **Units System**: Admin can grant units; transaction history tracked
 5. **Admin Panel**: Upload resources, manage folders, manage users, grant units
 6. **Protected Storage**: Files stored in GCS via App Storage; signed URLs expire (60min view, 15min download)
+7. **Social Feed**: Facebook-style newsfeed with posts, comments, and likes (real-time via WebSocket)
+8. **Real-Time Chat**: Direct messaging between users with WebSocket-powered live updates
+9. **Profile Photos**: Upload profile photos (max 2MB; JPEG/PNG/GIF/WebP only) from the account page
 
 ## API Routes
 
@@ -89,7 +98,10 @@ Express 5 API server. Routes in `src/routes/`.
 - `folders.ts` — folder CRUD
 - `resources.ts` — resource upload/view/download with GCS signed URLs + units deduction
 - `units.ts` — units balance, transactions, admin management
-- `auth.ts` — Replit OIDC auth flow
+- `auth.ts` — Replit OIDC auth flow + profile photo upload
+- `social.ts` — social feed: posts CRUD, comments, reactions (likes)
+- `chat.ts` — chat: conversations, messages, user list
+- `lib/websocket.ts` — WebSocket server for real-time chat and feed updates
 
 ### `artifacts/acadvault` (`@workspace/acadvault`)
 
@@ -99,8 +111,11 @@ React + Vite frontend. Pages in `src/pages/`:
 - `browse.tsx` — hierarchical folder browser with breadcrumbs
 - `resource-detail.tsx` — resource viewer (PDF iframe) + download with units
 - `search.tsx` — search results
-- `account.tsx` — user profile + unit balance + transaction history
+- `feed.tsx` — social newsfeed with posts, comments, likes (real-time)
+- `chat.tsx` — real-time chat with conversations and messages
+- `account.tsx` — user profile + unit balance + transaction history + profile photo upload
 - `admin.tsx` — admin dashboard: folders, upload resources, manage users
+- `hooks/use-websocket.ts` — shared singleton WebSocket client with auto-reconnect
 
 ### `lib/db` (`@workspace/db`)
 
