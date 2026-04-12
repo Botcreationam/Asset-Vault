@@ -84,9 +84,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <Sidebar variant="sidebar" className="border-r border-sidebar-border shadow-sm">
           <SidebarHeader className="p-4">
             <Link href="/" className="flex items-center gap-2 px-2 py-1">
-              <div className="bg-primary text-primary-foreground p-1.5 rounded-lg shadow-sm">
-                <BookOpen className="w-5 h-5" />
-              </div>
+              <img src="/logo.png" alt="AcadVault" className="w-8 h-8 rounded-lg shadow-sm" />
               <span className="font-serif font-bold text-xl tracking-tight text-sidebar-foreground">
                 AcadVault
               </span>
