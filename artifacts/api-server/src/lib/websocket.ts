@@ -4,6 +4,7 @@ import { getSession, getSessionId } from "./auth";
 import cookie from "cookie";
 
 const userConnections = new Map<string, Set<WebSocket>>();
+const MAX_CONNECTIONS_PER_USER = 5;
 
 export function setupWebSocket(server: Server) {
   const wss = new WebSocketServer({ server, path: "/api/ws" });
@@ -28,7 +29,17 @@ export function setupWebSocket(server: Server) {
     if (!userConnections.has(userId)) {
       userConnections.set(userId, new Set());
     }
-    userConnections.get(userId)!.add(ws);
+
+    const existing = userConnections.get(userId)!;
+    if (existing.size >= MAX_CONNECTIONS_PER_USER) {
+      const oldest = existing.values().next().value;
+      if (oldest) {
+        oldest.close(4002, "Too many connections");
+        existing.delete(oldest);
+      }
+    }
+
+    existing.add(ws);
 
     ws.on("close", () => {
       const connections = userConnections.get(userId);

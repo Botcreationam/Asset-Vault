@@ -7,8 +7,12 @@ import {
 } from "@workspace/db/schema";
 import { eq, desc, lt, and, sql } from "drizzle-orm";
 import { broadcast } from "../lib/websocket";
+import { postRateLimit, commentRateLimit, reactionRateLimit } from "../lib/rate-limit";
 
 const router: IRouter = Router();
+
+const MAX_POST_LENGTH = 2000;
+const MAX_COMMENT_LENGTH = 1000;
 
 router.get("/social/posts", async (req, res) => {
   if (!req.isAuthenticated()) {
@@ -82,7 +86,7 @@ router.get("/social/posts", async (req, res) => {
   });
 });
 
-router.post("/social/posts", async (req, res) => {
+router.post("/social/posts", postRateLimit, async (req, res) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "Not authenticated" });
     return;
@@ -94,8 +98,8 @@ router.post("/social/posts", async (req, res) => {
     return;
   }
 
-  if (content.length > 2000) {
-    res.status(400).json({ error: "Content too long (max 2000 chars)" });
+  if (content.length > MAX_POST_LENGTH) {
+    res.status(400).json({ error: `Content too long (max ${MAX_POST_LENGTH} chars)` });
     return;
   }
 
@@ -169,6 +173,12 @@ router.get("/social/posts/:postId/comments", async (req, res) => {
   }
 
   const postId = Number(req.params.postId);
+  if (isNaN(postId)) {
+    res.status(400).json({ error: "Invalid post ID" });
+    return;
+  }
+
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
 
   const comments = await db
     .select({
@@ -185,7 +195,8 @@ router.get("/social/posts/:postId/comments", async (req, res) => {
     .from(postCommentsTable)
     .leftJoin(usersTable, eq(postCommentsTable.authorId, usersTable.id))
     .where(eq(postCommentsTable.postId, postId))
-    .orderBy(postCommentsTable.createdAt);
+    .orderBy(postCommentsTable.createdAt)
+    .limit(limit);
 
   res.json({
     comments: comments.map((c) => ({
@@ -204,7 +215,7 @@ router.get("/social/posts/:postId/comments", async (req, res) => {
   });
 });
 
-router.post("/social/posts/:postId/comments", async (req, res) => {
+router.post("/social/posts/:postId/comments", commentRateLimit, async (req, res) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "Not authenticated" });
     return;
@@ -215,6 +226,11 @@ router.post("/social/posts/:postId/comments", async (req, res) => {
 
   if (!content || typeof content !== "string" || content.trim().length === 0) {
     res.status(400).json({ error: "Content is required" });
+    return;
+  }
+
+  if (content.length > MAX_COMMENT_LENGTH) {
+    res.status(400).json({ error: `Comment too long (max ${MAX_COMMENT_LENGTH} chars)` });
     return;
   }
 
@@ -262,7 +278,7 @@ router.post("/social/posts/:postId/comments", async (req, res) => {
   res.status(201).json(fullComment);
 });
 
-router.post("/social/posts/:postId/react", async (req, res) => {
+router.post("/social/posts/:postId/react", reactionRateLimit, async (req, res) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "Not authenticated" });
     return;

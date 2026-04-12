@@ -6,9 +6,11 @@ import resourcesRouter from "./resources";
 import unitsRouter from "./units";
 import socialRouter from "./social";
 import chatRouter from "./chat";
+import { apiRateLimit } from "../lib/rate-limit";
 
 const router: IRouter = Router();
 
+router.use(apiRateLimit);
 router.use(healthRouter);
 router.use(authRouter);
 router.use(foldersRouter);

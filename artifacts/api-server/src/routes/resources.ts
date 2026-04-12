@@ -14,12 +14,13 @@ import {
   ViewResourceParams,
   DownloadResourceParams,
 } from "@workspace/api-zod";
-import { eq, and, like, or, desc } from "drizzle-orm";
+import { eq, and, like, or, desc, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import multer from "multer";
 import { objectStorageClient } from "../lib/objectStorage";
 import { ensureUserUnits } from "./units";
 import { logAudit } from "../lib/audit";
+import { downloadRateLimit } from "../lib/rate-limit";
 
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
@@ -115,7 +116,10 @@ router.get("/resources", async (req, res) => {
       and(
         eq(resourcesTable.isActive, true),
         folderId ? eq(resourcesTable.folderId, folderId) : undefined,
-        search ? or(like(resourcesTable.name, `%${search}%`), like(resourcesTable.description ?? "", `%${search}%`)) : undefined,
+        search ? or(
+          like(resourcesTable.name, `%${search.replace(/%/g, "").replace(/_/g, "")}%`),
+          like(resourcesTable.description ?? "", `%${search.replace(/%/g, "").replace(/_/g, "")}%`),
+        ) : undefined,
         type ? eq(resourcesTable.type, type as any) : undefined,
       )
     );
@@ -404,7 +408,7 @@ router.get("/resources/:resourceId/stream", async (req, res) => {
   }
 });
 
-router.post("/resources/:resourceId/download", async (req, res) => {
+router.post("/resources/:resourceId/download", downloadRateLimit, async (req, res) => {
   try {
     if (!req.isAuthenticated()) {
       res.status(401).json({ error: "Authentication required" });
@@ -427,24 +431,37 @@ router.post("/resources/:resourceId/download", async (req, res) => {
       return;
     }
 
-    const currentBalance = await ensureUserUnits(req.user.id);
+    await ensureUserUnits(req.user.id);
     const cost = resource.downloadCost;
 
-    if (currentBalance < cost) {
+    const [updated] = await db
+      .update(userUnitsTable)
+      .set({
+        balance: sql`${userUnitsTable.balance} - ${cost}`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(userUnitsTable.userId, req.user.id),
+          sql`${userUnitsTable.balance} >= ${cost}`,
+        ),
+      )
+      .returning({ balance: userUnitsTable.balance });
+
+    if (!updated) {
+      const [current] = await db
+        .select({ balance: userUnitsTable.balance })
+        .from(userUnitsTable)
+        .where(eq(userUnitsTable.userId, req.user.id));
       res.status(402).json({
         error: "Insufficient units",
-        balance: currentBalance,
+        balance: current?.balance ?? 0,
         required: cost,
       });
       return;
     }
 
-    const newBalance = currentBalance - cost;
-
-    await db
-      .update(userUnitsTable)
-      .set({ balance: newBalance, updatedAt: new Date() })
-      .where(eq(userUnitsTable.userId, req.user.id));
+    const newBalance = updated.balance;
 
     await db.insert(unitsTransactionsTable).values({
       userId: req.user.id,
