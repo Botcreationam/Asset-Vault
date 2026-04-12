@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AuthWrapper } from "@/components/auth-wrapper";
 import {
   useListFolders,
@@ -443,7 +443,7 @@ function FilesTab() {
   const [resources, setResources] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const fetchResources = async () => {
+  const fetchResources = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`${BASE_URL}api/admin/resources`, { credentials: "include" });
@@ -454,11 +454,11 @@ function FilesTab() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
-  if (resources === null && !loading) {
+  useEffect(() => {
     fetchResources();
-  }
+  }, [fetchResources]);
 
   const deleteResourceMut = useDeleteResource({
     mutation: {
