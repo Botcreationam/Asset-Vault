@@ -52,6 +52,7 @@ artifacts-monorepo/
 - **posts** — Social feed posts (id, authorId, content, imageUrl, likesCount, commentsCount, createdAt)
 - **post_comments** — Comments on posts (id, postId, authorId, content, createdAt)
 - **post_reactions** — Like reactions on posts (id, postId, userId, createdAt; unique per user+post)
+- **user_active_sessions** — Device/session tracking (id, userId, sessionId, deviceFingerprint, ipAddress, userAgent, lastActiveAt)
 - **conversations** — Chat conversations (id, name, isGroup, createdAt)
 - **conversation_participants** — Users in a conversation (id, conversationId, userId, joinedAt)
 - **messages** — Chat messages (id, conversationId, senderId, content, createdAt)
@@ -78,6 +79,32 @@ artifacts-monorepo/
 - **WebSocket Protection**: Max 5 connections per user, session-cookie auth required
 - **Self-Service Topup Disabled**: Only admins can topup units; prevents free-unit abuse
 - **Search Sanitization**: LIKE wildcards (`%`, `_`) stripped from search input
+
+### Content Protection System
+- **Secure Streaming**: All content served through authenticated backend proxy (`/resources/:id/stream`), never via raw storage URLs
+- **Range-based Streaming**: HTTP Range request support for chunked content delivery (partial content / 206 responses)
+- **Keyboard Shortcut Blocking**: Ctrl+S, Ctrl+P, Ctrl+C, Ctrl+A, Ctrl+U, F12, PrintScreen, DevTools shortcuts all intercepted
+- **Right-click Prevention**: Context menu disabled on the viewer
+- **Copy/Cut/Paste Blocking**: Clipboard events intercepted at document level while viewing
+- **Drag Prevention**: DragStart and Drop events blocked globally
+- **Text Selection Disabled**: CSS `user-select: none` with vendor prefixes
+- **Print Blocking**: CSS `@media print` hides all content and shows a "printing disabled" message
+- **Visibility API Blur**: Content blurred/hidden when user switches tabs or window loses focus (screenshot discouragement)
+- **User-specific Watermarking**: Two overlay layers — diagonal email/ID watermark + secondary user ID grid for forensic identification
+- **Iframe Sandbox**: Viewer iframe sandboxed (no `allow-downloads`) to prevent save-file dialogs
+- **No-Cache Headers**: `Cache-Control: no-store, no-cache, must-revalidate`, `Pragma: no-cache`, `Expires: 0` on all streamed content
+- **Content-Security-Policy**: `script-src 'none'; object-src 'none'; frame-ancestors 'self'` on streamed responses
+
+### Device & Session Management
+- **Device Limit**: Max 3 active sessions/devices per user; oldest session auto-evicted when limit exceeded
+- **Session Tracking**: `user_active_sessions` table stores device fingerprints, IP addresses, user agents, last-active timestamps
+- **Automatic Cleanup**: Sessions older than 30 minutes auto-purged
+- **Active Sessions API**: `GET /api/user/active-sessions` lets users see their active devices
+
+### Suspicious Activity Detection
+- **Cross-resource Monitoring**: In-memory tracker detects when a user streams >20 distinct resources within a 5-minute window
+- **Automatic Blocking**: Suspicious users are temporarily blocked from streaming for 15 minutes
+- **Per-resource Rate Limit**: Max 60 stream requests per user per resource per hour
 
 ## API Routes
 

@@ -119,6 +119,17 @@ export const auditLogsTable = pgTable("audit_logs", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const userActiveSessionsTable = pgTable("user_active_sessions", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  sessionId: text("session_id").notNull(),
+  deviceFingerprint: text("device_fingerprint"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  lastActiveAt: timestamp("last_active_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const postsTable = pgTable("posts", {
   id: serial("id").primaryKey(),
   authorId: text("author_id").notNull(),
