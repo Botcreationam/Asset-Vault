@@ -193,6 +193,104 @@ export interface SuccessResponse {
   success: boolean;
 }
 
+export interface ProfilePhotoResponse {
+  profileImageUrl: string;
+}
+
+export interface PostAuthor {
+  id: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  profileImageUrl?: string;
+}
+
+export interface Post {
+  id: number;
+  content: string;
+  imageUrl?: string;
+  likesCount: number;
+  commentsCount: number;
+  liked: boolean;
+  createdAt: string;
+  author: PostAuthor;
+}
+
+export interface PostListResponse {
+  posts: Post[];
+  nextCursor?: number;
+}
+
+export interface CreatePostBody {
+  content: string;
+}
+
+export interface Comment {
+  id: number;
+  postId: number;
+  content: string;
+  createdAt: string;
+  author: PostAuthor;
+}
+
+export interface CommentListResponse {
+  comments: Comment[];
+}
+
+export interface CreateCommentBody {
+  content: string;
+}
+
+export interface ReactionResponse {
+  liked: boolean;
+  likesCount: number;
+}
+
+export interface Message {
+  id: number;
+  conversationId: number;
+  senderId: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface Conversation {
+  id: number;
+  participant: PostAuthor;
+  lastMessage?: Message;
+  unreadCount: number;
+  updatedAt: string;
+}
+
+export interface ConversationListResponse {
+  conversations: Conversation[];
+}
+
+export interface CreateConversationBody {
+  userId: string;
+}
+
+export interface MessageListResponse {
+  messages: Message[];
+  nextCursor?: number;
+}
+
+export interface SendMessageBody {
+  content: string;
+}
+
+export interface ChatUser {
+  id: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  profileImageUrl?: string;
+}
+
+export interface ChatUserListResponse {
+  users: ChatUser[];
+}
+
 export type ListFoldersParams = {
   parentId?: string;
 };
@@ -201,4 +299,18 @@ export type ListResourcesParams = {
   folderId?: string;
   search?: string;
   type?: string;
+};
+
+export type UploadProfilePhotoBody = {
+  photo: Blob;
+};
+
+export type ListPostsParams = {
+  cursor?: number;
+  limit?: number;
+};
+
+export type ListMessagesParams = {
+  cursor?: number;
+  limit?: number;
 };

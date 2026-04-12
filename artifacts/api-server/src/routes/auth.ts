@@ -295,6 +295,50 @@ router.get("/callback", async (req: Request, res: Response) => {
   res.redirect(returnTo);
 });
 
+router.post("/auth/profile-photo", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+
+  const multer = (await import("multer")).default;
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } }).single("photo");
+
+  upload(req, res, async (err: any) => {
+    if (err) {
+      res.status(400).json({ error: "Upload failed: " + err.message });
+      return;
+    }
+
+    try {
+      const file = (req as any).file;
+      if (!file) {
+        res.status(400).json({ error: "No file uploaded" });
+        return;
+      }
+
+      const allowedMimes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+      if (!allowedMimes.includes(file.mimetype)) {
+        res.status(400).json({ error: "Only JPEG, PNG, GIF, and WebP images are allowed" });
+        return;
+      }
+
+      const base64 = file.buffer.toString("base64");
+      const dataUrl = `data:${file.mimetype};base64,${base64}`;
+
+      await db
+        .update(usersTable)
+        .set({ profileImageUrl: dataUrl })
+        .where(eq(usersTable.id, req.user!.id));
+
+      res.json({ profileImageUrl: dataUrl });
+    } catch (e) {
+      console.error("Profile photo upload error:", e);
+      res.status(500).json({ error: "Failed to upload photo" });
+    }
+  });
+});
+
 router.get("/logout", async (req: Request, res: Response) => {
   const config = await getOidcConfig();
   const origin = getOrigin(req);

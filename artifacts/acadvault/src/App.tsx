@@ -6,13 +6,14 @@ import NotFound from "@/pages/not-found";
 
 import { AppLayout } from "@/components/layout/app-layout";
 
-// Pages
 import Home from "@/pages/home";
 import Browse from "@/pages/browse";
 import ResourceDetail from "@/pages/resource-detail";
 import Account from "@/pages/account";
 import Admin from "@/pages/admin";
 import Search from "@/pages/search";
+import Feed from "@/pages/feed";
+import Chat from "@/pages/chat";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +33,8 @@ function Router() {
         <Route path="/browse/:folderId?" component={Browse} />
         <Route path="/resource/:resourceId" component={ResourceDetail} />
         <Route path="/search" component={Search} />
+        <Route path="/feed" component={Feed} />
+        <Route path="/chat" component={Chat} />
         <Route path="/account" component={Account} />
         <Route path="/admin" component={Admin} />
         <Route component={NotFound} />

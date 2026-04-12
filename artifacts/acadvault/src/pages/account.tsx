@@ -18,6 +18,8 @@ import {
   Pencil,
   Check,
   X,
+  Camera,
+  Loader2,
 } from "lucide-react";
 import {
   Card,
@@ -43,6 +45,7 @@ export default function Account() {
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [form, setForm] = useState({
     username: "",
     firstName: "",
@@ -100,14 +103,55 @@ export default function Account() {
           {/* Profile Card */}
           <Card className="md:col-span-1 bg-card shadow-md border-border/60">
             <CardHeader className="text-center pb-2">
-              <Avatar className="w-24 h-24 mx-auto mb-4 border-4 border-background shadow-lg">
-                <AvatarImage src={user?.profileImageUrl} />
-                <AvatarFallback className="bg-primary/10 text-primary text-2xl font-bold">
-                  {user?.firstName?.charAt(0) ||
-                    user?.username?.charAt(0) ||
-                    "U"}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative w-24 h-24 mx-auto mb-4">
+                <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
+                  <AvatarImage src={user?.profileImageUrl} />
+                  <AvatarFallback className="bg-primary/10 text-primary text-2xl font-bold">
+                    {user?.firstName?.charAt(0) ||
+                      user?.username?.charAt(0) ||
+                      "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <label className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-1.5 rounded-full cursor-pointer shadow-md hover:bg-primary/90 transition-colors">
+                  {uploadingPhoto ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="w-3.5 h-3.5" />
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingPhoto}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 2 * 1024 * 1024) {
+                        toast({ title: "Photo must be under 2MB", variant: "destructive" });
+                        return;
+                      }
+                      setUploadingPhoto(true);
+                      try {
+                        const formData = new FormData();
+                        formData.append("photo", file);
+                        const res = await fetch(`${BASE_URL}api/auth/profile-photo`, {
+                          method: "POST",
+                          credentials: "include",
+                          body: formData,
+                        });
+                        if (!res.ok) throw new Error("Upload failed");
+                        toast({ title: "Profile photo updated!" });
+                        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+                      } catch {
+                        toast({ title: "Failed to upload photo", variant: "destructive" });
+                      } finally {
+                        setUploadingPhoto(false);
+                        e.target.value = "";
+                      }
+                    }}
+                  />
+                </label>
+              </div>
 
               {!editing ? (
                 <>
