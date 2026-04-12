@@ -131,10 +131,16 @@ router.get("/admin/users", async (req, res) => {
       return;
     }
 
+    const PERM_ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+
     const users = await db
       .select({
         id: usersTable.id,
         username: usersTable.username,
+        email: usersTable.email,
         firstName: usersTable.firstName,
         lastName: usersTable.lastName,
         profileImageUrl: usersTable.profileImageUrl,
@@ -147,7 +153,8 @@ router.get("/admin/users", async (req, res) => {
     const usersWithUnits = await Promise.all(
       users.map(async (u) => {
         const balance = await ensureUserUnits(u.id);
-        return { ...u, unitsBalance: balance, downloadCount: 0 };
+        const isPermanentAdmin = !!(u.email && PERM_ADMIN_EMAILS.includes(u.email.toLowerCase()));
+        return { ...u, unitsBalance: balance, downloadCount: 0, isPermanentAdmin };
       })
     );
 
@@ -174,6 +181,30 @@ router.patch("/admin/users/:userId/role", async (req, res) => {
     const body = AdminUpdateUserRoleBody.safeParse(req.body);
     if (!body.success) {
       res.status(400).json({ error: "Invalid body" });
+      return;
+    }
+
+    const PERMANENT_ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+
+    const [targetUser] = await db
+      .select({ id: usersTable.id, email: usersTable.email, role: usersTable.role })
+      .from(usersTable)
+      .where(eq(usersTable.id, params.data.userId));
+
+    if (!targetUser) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    if (
+      targetUser.email &&
+      PERMANENT_ADMIN_EMAILS.includes(targetUser.email.toLowerCase()) &&
+      body.data.role !== "admin"
+    ) {
+      res.status(403).json({ error: "This admin account is permanently protected and cannot be demoted" });
       return;
     }
 

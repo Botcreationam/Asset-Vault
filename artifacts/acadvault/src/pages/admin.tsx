@@ -213,20 +213,29 @@ export default function AdminDashboard() {
                             {u.unitsBalance}
                           </td>
                           <td className="px-4 py-4">
-                            <Select
-                              defaultValue={u.role}
-                              onValueChange={(v) =>
-                                handleRoleChange(u.id, v as any)
-                              }
-                            >
-                              <SelectTrigger className="w-[110px] h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="student">Student</SelectItem>
-                                <SelectItem value="admin">Admin</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            {u.isPermanentAdmin ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-xs font-bold">
+                                  <Shield className="w-3 h-3" />
+                                  Super Admin
+                                </span>
+                              </div>
+                            ) : (
+                              <Select
+                                defaultValue={u.role}
+                                onValueChange={(v) =>
+                                  handleRoleChange(u.id, v as any)
+                                }
+                              >
+                                <SelectTrigger className="w-[110px] h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="student">Student</SelectItem>
+                                  <SelectItem value="admin">Admin</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
                           </td>
                           <td className="px-4 py-4 text-right">
                             <GrantUnitsDialog

@@ -90,7 +90,10 @@ artifacts-monorepo/
 - **Drag Prevention**: DragStart and Drop events blocked globally
 - **Text Selection Disabled**: CSS `user-select: none` with vendor prefixes
 - **Print Blocking**: CSS `@media print` hides all content and shows a "printing disabled" message
-- **Visibility API Blur**: Content blurred/hidden when user switches tabs or window loses focus (screenshot discouragement)
+- **Visibility API Blur**: Content hidden with black screen when user switches tabs or window loses focus (screenshot prevention)
+- **DRM Screen Capture Protection**: Uses Encrypted Media Extensions (EME) with ClearKey — the DRM video overlay causes screen capture tools to record a black screen instead of content (same technique as Netflix/WhatsApp)
+- **Screen Recording Interception**: `getDisplayMedia` API is intercepted — content auto-hides when screen sharing/recording begins
+- **PrintScreen Key Blocking**: PrintScreen key captured and content immediately hidden for 3 seconds with warning message
 - **User-specific Watermarking**: Two overlay layers — diagonal email/ID watermark + secondary user ID grid for forensic identification
 - **Iframe Sandbox**: Viewer iframe sandboxed (no `allow-downloads`) to prevent save-file dialogs
 - **No-Cache Headers**: `Cache-Control: no-store, no-cache, must-revalidate`, `Pragma: no-cache`, `Expires: 0` on all streamed content
@@ -185,6 +188,8 @@ Run codegen: `pnpm --filter @workspace/api-spec run codegen`
 ## Admin Setup
 
 Admin users are determined by the `ADMIN_EMAILS` environment variable (comma-separated list of email addresses). If not set, no users are auto-promoted to admin on login.
+
+**Permanent (Super) Admins**: Emails listed in `ADMIN_EMAILS` are permanently protected — they cannot be demoted to student by any other admin. They appear with a "Super Admin" badge in the admin panel, and the role selector is hidden for them. The server enforces this with a 403 response if anyone tries to change their role via API.
 
 To manually make the first admin user:
 ```sql

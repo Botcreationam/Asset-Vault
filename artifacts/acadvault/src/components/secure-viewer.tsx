@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Loader2, FileText, ShieldCheck, EyeOff } from "lucide-react";
+import { Loader2, FileText, ShieldCheck, EyeOff, ShieldAlert } from "lucide-react";
 
 interface SecureViewerProps {
   resourceId: string;
@@ -17,8 +17,45 @@ export function SecureViewer({
   userId,
 }: SecureViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [isHidden, setIsHidden] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
+  const [warningMessage, setWarningMessage] = useState("This action is disabled for protected content");
+  const [drmSupported, setDrmSupported] = useState(false);
+
+  const triggerWarning = useCallback((msg?: string) => {
+    setWarningMessage(msg || "This action is disabled for protected content");
+    setShowWarning(true);
+    setTimeout(() => setShowWarning(false), 2500);
+  }, []);
+
+  useEffect(() => {
+    async function setupDrmOverlay() {
+      try {
+        const video = videoRef.current;
+        if (!video) return;
+
+        const config = [{
+          initDataTypes: ["cenc"],
+          videoCapabilities: [{
+            contentType: 'video/mp4; codecs="avc1.42E01E"',
+            robustness: "SW_SECURE_DECODE",
+          }],
+        }];
+
+        const keySystemAccess = await navigator.requestMediaKeySystemAccess(
+          "org.w3.clearkey",
+          config
+        );
+        const mediaKeys = await keySystemAccess.createMediaKeys();
+        await video.setMediaKeys(mediaKeys);
+        setDrmSupported(true);
+      } catch {
+        setDrmSupported(false);
+      }
+    }
+    setupDrmOverlay();
+  }, []);
 
   useEffect(() => {
     const blocked = (e: KeyboardEvent) => {
@@ -31,8 +68,13 @@ export function SecureViewer({
       ) {
         e.preventDefault();
         e.stopPropagation();
-        setShowWarning(true);
-        setTimeout(() => setShowWarning(false), 2000);
+        if (e.key === "PrintScreen") {
+          setIsHidden(true);
+          triggerWarning("Screenshot blocked — content is protected");
+          setTimeout(() => setIsHidden(false), 3000);
+        } else {
+          triggerWarning();
+        }
       }
     };
 
@@ -61,14 +103,14 @@ export function SecureViewer({
       document.removeEventListener("dragstart", blockDrag, true);
       document.removeEventListener("drop", blockDrag, true);
     };
-  }, []);
+  }, [triggerWarning]);
 
   useEffect(() => {
     const handleVisibility = () => {
       if (document.hidden) {
         setIsHidden(true);
       } else {
-        setTimeout(() => setIsHidden(false), 300);
+        setTimeout(() => setIsHidden(false), 500);
       }
     };
 
@@ -77,7 +119,7 @@ export function SecureViewer({
     };
 
     const handleFocus = () => {
-      setTimeout(() => setIsHidden(false), 300);
+      setTimeout(() => setIsHidden(false), 500);
     };
 
     document.addEventListener("visibilitychange", handleVisibility);
@@ -90,6 +132,34 @@ export function SecureViewer({
       window.removeEventListener("focus", handleFocus);
     };
   }, []);
+
+  useEffect(() => {
+    let displayMediaCleanup: (() => void) | null = null;
+
+    const detectScreenCapture = () => {
+      if (!navigator.mediaDevices?.getDisplayMedia) return;
+
+      const origGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+      navigator.mediaDevices.getDisplayMedia = async function (...args: any[]) {
+        setIsHidden(true);
+        triggerWarning("Screen recording detected — content hidden");
+        const result = await origGetDisplayMedia(...args);
+        result.getTracks().forEach((track: MediaStreamTrack) => {
+          track.addEventListener("ended", () => {
+            setTimeout(() => setIsHidden(false), 1000);
+          });
+        });
+        return result;
+      };
+
+      displayMediaCleanup = () => {
+        navigator.mediaDevices.getDisplayMedia = origGetDisplayMedia;
+      };
+    };
+
+    detectScreenCapture();
+    return () => { displayMediaCleanup?.(); };
+  }, [triggerWarning]);
 
   const blockContext = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -135,6 +205,22 @@ export function SecureViewer({
           -moz-user-drag: none !important;
           user-drag: none !important;
         }
+        .secure-viewer-drm-layer {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          z-index: 3;
+          pointer-events: none;
+          object-fit: cover;
+        }
+        .secure-viewer-drm-layer::-webkit-media-controls {
+          display: none !important;
+        }
+        .secure-viewer-drm-layer::-webkit-media-controls-enclosure {
+          display: none !important;
+        }
       `}</style>
 
       <div
@@ -147,17 +233,18 @@ export function SecureViewer({
         onSelectStart={(e: any) => e.preventDefault()}
       >
         {isHidden && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-xl transition-all duration-200">
-            <EyeOff className="w-12 h-12 text-muted-foreground mb-3 opacity-50" />
-            <p className="text-sm font-semibold text-muted-foreground">Content hidden for protection</p>
-            <p className="text-xs text-muted-foreground/70 mt-1">Return to this tab to continue reading</p>
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black transition-all duration-100">
+            <ShieldAlert className="w-14 h-14 text-red-500 mb-3 animate-pulse" />
+            <p className="text-base font-bold text-white">Content Protected</p>
+            <p className="text-xs text-gray-400 mt-1">Screenshots and screen recording are not allowed</p>
+            <p className="text-xs text-gray-500 mt-3">Return to this tab to continue reading</p>
           </div>
         )}
 
         {showWarning && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-lg bg-destructive/90 text-destructive-foreground px-4 py-2 text-sm font-medium shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
-            <ShieldCheck className="w-4 h-4" />
-            This action is disabled for protected content
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 rounded-lg bg-red-600/95 text-white px-4 py-2.5 text-sm font-medium shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+            <ShieldAlert className="w-4 h-4" />
+            {warningMessage}
           </div>
         )}
 
@@ -221,6 +308,21 @@ export function SecureViewer({
             userSelect: "none",
           }}
         />
+
+        {drmSupported && (
+          <video
+            ref={videoRef}
+            className="secure-viewer-drm-layer"
+            autoPlay
+            muted
+            loop
+            playsInline
+            tabIndex={-1}
+            aria-hidden="true"
+          >
+            <source src="data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAAhtZGF0AAAA1m1vb3YAAABsbXZoZAAAAAAAAAAAAAAAAAAAA+gAAAAAAAEAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAABidWR0YQAAAFptZXRhAAAAAAAAACFoZGxyAAAAAAAAAABtZGlyYXBwbAAAAAAAAAAAAAAAAC1pbHN0AAAAJal0b28AAAAdZGF0YQAAAAEAAAAATGF2ZjYwLjMuMTAw" type="video/mp4" />
+          </video>
+        )}
 
         <iframe
           key={streamUrl}
