@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AuthWrapper } from "@/components/auth-wrapper";
 import {
   useListFolders,
@@ -29,6 +29,7 @@ import {
   Folder,
   CheckCircle2,
   XCircle,
+  ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -103,9 +104,17 @@ const ACTION_COLORS: Record<string, string> = {
 export default function AdminDashboard() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [allFoldersForUpload, setAllFoldersForUpload] = useState<any[]>([]);
 
   const { data: usersData } = useAdminListUsers();
   const { data: foldersData, refetch: refetchFolders } = useListFolders();
+
+  useEffect(() => {
+    fetch(`${BASE_URL}api/folders/all`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => setAllFoldersForUpload(d.folders || []))
+      .catch(() => {});
+  }, []);
 
   const updateRoleMutation = useAdminUpdateUserRole({
     mutation: {
@@ -153,7 +162,7 @@ export default function AdminDashboard() {
           </TabsList>
 
           <TabsContent value="resources" className="space-y-6">
-            <ResourceUploadTab folders={foldersData?.folders || []} />
+            <ResourceUploadTab folders={allFoldersForUpload.length > 0 ? allFoldersForUpload : (foldersData?.folders || [])} />
           </TabsContent>
 
           <TabsContent value="files">
@@ -373,9 +382,9 @@ function ResourceUploadTab({ folders }: { folders: any[] }) {
                   <SelectValue placeholder="Select folder" />
                 </SelectTrigger>
                 <SelectContent>
-                  {folders?.map((f) => (
+                  {folders?.map((f: any) => (
                     <SelectItem key={f.id} value={f.id}>
-                      {f.name}
+                      {"  ".repeat(f.level || 0)}{(f.level || 0) > 0 ? "└ " : ""}{f.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -426,6 +435,10 @@ function FilesTab() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteName, setDeleteName] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [editingResource, setEditingResource] = useState<any>(null);
+  const [editResName, setEditResName] = useState("");
+  const [editResDesc, setEditResDesc] = useState("");
+  const [editResCost, setEditResCost] = useState("5");
 
   const [resources, setResources] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -466,6 +479,29 @@ function FilesTab() {
     setDeleteId(id);
     setDeleteName(name);
     setConfirmOpen(true);
+  };
+
+  const handleEditResource = async () => {
+    if (!editingResource || !editResName.trim()) return;
+    try {
+      const res = await fetch(`${BASE_URL}api/resources/${editingResource.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: editResName.trim(),
+          description: editResDesc.trim(),
+          downloadCost: parseInt(editResCost) || 5,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast({ title: "Resource updated" });
+      setEditingResource(null);
+      fetchResources();
+      queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
+    } catch {
+      toast({ title: "Failed to update resource", variant: "destructive" });
+    }
   };
 
   const TYPE_COLORS: Record<string, string> = {
@@ -532,14 +568,29 @@ function FilesTab() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         {r.isActive && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 h-7 px-2"
-                            onClick={() => confirmDelete(r.id, r.name)}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
+                          <div className="flex items-center gap-1 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground hover:text-foreground h-7 px-2"
+                              onClick={() => {
+                                setEditingResource(r);
+                                setEditResName(r.name);
+                                setEditResDesc(r.description || "");
+                                setEditResCost(String(r.downloadCost || 5));
+                              }}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 h-7 px-2"
+                              onClick={() => confirmDelete(r.id, r.name)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -583,16 +634,112 @@ function FilesTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!editingResource} onOpenChange={(o) => !o && setEditingResource(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Resource</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Name</label>
+              <Input value={editResName} onChange={(e) => setEditResName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Description</label>
+              <Input value={editResDesc} onChange={(e) => setEditResDesc(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Download Cost (Units)</label>
+              <Input type="number" value={editResCost} onChange={(e) => setEditResCost(e.target.value)} min="0" />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingResource(null)}>Cancel</Button>
+              <Button onClick={handleEditResource} disabled={!editResName.trim()}>Save Changes</Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
 
 // ── Folders Tab ───────────────────────────────────────────────────────────────
 
+function FolderTreeItem({
+  folder,
+  allFolders,
+  depth,
+  onEdit,
+  onDelete,
+}: {
+  folder: any;
+  allFolders: any[];
+  depth: number;
+  onEdit: (f: any) => void;
+  onDelete: (f: any) => void;
+}) {
+  const [expanded, setExpanded] = useState(depth < 2);
+  const children = allFolders.filter((f) => f.parentId === folder.id);
+
+  return (
+    <div>
+      <div
+        className="flex items-center justify-between px-4 py-2.5 bg-card hover:bg-muted/20 transition-colors border-b border-border/30"
+        style={{ paddingLeft: `${16 + depth * 24}px` }}
+      >
+        <div className="flex items-center gap-2 min-w-0 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+          {children.length > 0 && (
+            <ChevronRight className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
+          )}
+          {children.length === 0 && <span className="w-3.5" />}
+          <Folder className="w-4 h-4 text-primary/60 shrink-0" />
+          <div className="min-w-0">
+            <span className="font-medium block truncate text-sm">{folder.name}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0 ml-4">
+          <Badge variant="secondary" className="text-[10px] hidden sm:inline-flex">
+            L{folder.level}
+          </Badge>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+            onClick={() => onEdit(folder)}
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-rose-400 hover:text-rose-600 hover:bg-rose-50"
+            onClick={() => onDelete(folder)}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+      {expanded &&
+        children.map((child) => (
+          <FolderTreeItem
+            key={child.id}
+            folder={child}
+            allFolders={allFolders}
+            depth={depth + 1}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        ))}
+    </div>
+  );
+}
+
 function FoldersTab({ folders, refetch }: { folders: any[]; refetch: () => void }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editFolder, setEditFolder] = useState<any | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [allFolders, setAllFolders] = useState<any[] | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -605,6 +752,20 @@ function FoldersTab({ folders, refetch }: { folders: any[]; refetch: () => void 
     defaultValues: { name: "", description: "" },
   });
 
+  const fetchAllFolders = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}api/folders/all`, { credentials: "include" });
+      const data = await res.json();
+      setAllFolders(data.folders || []);
+    } catch {
+      setAllFolders(folders);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllFolders();
+  }, []);
+
   const createFolderMut = useCreateFolder({
     mutation: {
       onSuccess: () => {
@@ -612,6 +773,7 @@ function FoldersTab({ folders, refetch }: { folders: any[]; refetch: () => void 
         setIsCreateOpen(false);
         form.reset({ parentId: "root" });
         queryClient.invalidateQueries({ queryKey: ["/api/folders"] });
+        fetchAllFolders();
       },
     },
   });
@@ -624,6 +786,7 @@ function FoldersTab({ folders, refetch }: { folders: any[]; refetch: () => void 
         queryClient.invalidateQueries({ queryKey: ["/api/folders"] });
         queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
         queryClient.invalidateQueries({ queryKey: ["/api/admin/resources"] });
+        fetchAllFolders();
       },
       onError: () => {
         toast({ title: "Failed to delete folder", variant: "destructive" });
@@ -643,10 +806,14 @@ function FoldersTab({ folders, refetch }: { folders: any[]; refetch: () => void 
       toast({ title: "Folder renamed successfully" });
       setEditFolder(null);
       queryClient.invalidateQueries({ queryKey: ["/api/folders"] });
+      fetchAllFolders();
     } catch {
       toast({ title: "Failed to rename folder", variant: "destructive" });
     }
   };
+
+  const displayFolders = allFolders || folders;
+  const rootFolders = displayFolders.filter((f) => !f.parentId);
 
   return (
     <>
@@ -666,59 +833,30 @@ function FoldersTab({ folders, refetch }: { folders: any[]; refetch: () => void 
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="rounded-xl border border-border/50 divide-y divide-border/50 overflow-hidden">
-            {folders?.length === 0 ? (
+          <div className="rounded-xl border border-border/50 overflow-hidden">
+            {rootFolders.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">
                 No folders yet. Create one to get started.
               </p>
             ) : (
-              folders?.map((f) => (
-                <div
+              rootFolders.map((f) => (
+                <FolderTreeItem
                   key={f.id}
-                  className="flex items-center justify-between px-4 py-3 bg-card hover:bg-muted/20 transition-colors"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <FolderPlus className="w-4 h-4 text-primary/60 shrink-0" />
-                    <div className="min-w-0">
-                      <span className="font-medium block truncate">{f.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {f.resourceCount} file{f.resourceCount !== 1 ? "s" : ""} ·{" "}
-                        {f.subfolderCount} subfolder{f.subfolderCount !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0 ml-4">
-                    <Badge variant="secondary" className="text-xs hidden sm:inline-flex">
-                      {f.level === 0 ? "Root" : `Level ${f.level}`}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                      onClick={() => {
-                        setEditFolder(f);
-                        editForm.reset({ name: f.name, description: f.description || "" });
-                      }}
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 text-rose-400 hover:text-rose-600 hover:bg-rose-50"
-                      onClick={() => setDeleteTarget(f)}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </div>
+                  folder={f}
+                  allFolders={displayFolders}
+                  depth={0}
+                  onEdit={(folder) => {
+                    setEditFolder(folder);
+                    editForm.reset({ name: folder.name, description: folder.description || "" });
+                  }}
+                  onDelete={(folder) => setDeleteTarget(folder)}
+                />
               ))
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Create Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
           <DialogHeader>
@@ -760,9 +898,9 @@ function FoldersTab({ folders, refetch }: { folders: any[]; refetch: () => void 
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="root">-- Root Level --</SelectItem>
-                  {folders?.map((f) => (
+                  {displayFolders.map((f) => (
                     <SelectItem key={f.id} value={f.id}>
-                      {f.name}
+                      {"  ".repeat(f.level)}{f.level > 0 ? "└ " : ""}{f.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -779,7 +917,6 @@ function FoldersTab({ folders, refetch }: { folders: any[]; refetch: () => void 
         </DialogContent>
       </Dialog>
 
-      {/* Rename Dialog */}
       <Dialog open={!!editFolder} onOpenChange={(o) => !o && setEditFolder(null)}>
         <DialogContent>
           <DialogHeader>
@@ -807,7 +944,6 @@ function FoldersTab({ folders, refetch }: { folders: any[]; refetch: () => void 
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <Dialog
         open={!!deleteTarget}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
@@ -820,17 +956,8 @@ function FoldersTab({ folders, refetch }: { folders: any[]; refetch: () => void 
             <DialogDescription className="space-y-2 pt-2">
               <p>
                 You are about to permanently delete{" "}
-                <strong>"{deleteTarget?.name}"</strong>.
+                <strong>"{deleteTarget?.name}"</strong> and all nested content.
               </p>
-              {(deleteTarget?.resourceCount > 0 || deleteTarget?.subfolderCount > 0) && (
-                <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 text-sm text-rose-700">
-                  <AlertTriangle className="w-4 h-4 inline mr-1" />
-                  This folder contains{" "}
-                  <strong>{deleteTarget?.resourceCount} file(s)</strong> and{" "}
-                  <strong>{deleteTarget?.subfolderCount} subfolder(s)</strong> which will
-                  all be permanently removed.
-                </div>
-              )}
               <p className="text-muted-foreground text-sm">This action cannot be undone.</p>
             </DialogDescription>
           </DialogHeader>

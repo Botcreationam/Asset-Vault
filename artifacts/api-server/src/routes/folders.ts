@@ -11,7 +11,7 @@ import {
   DeleteFolderParams,
   GetFolderPathParams,
 } from "@workspace/api-zod";
-import { eq, isNull, count } from "drizzle-orm";
+import { eq, isNull, count, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { logAudit } from "../lib/audit";
 import { z } from "zod";
@@ -183,6 +183,23 @@ router.post("/folders", async (req, res) => {
       level = parent.level + 1;
     }
 
+    const [duplicate] = await db
+      .select({ id: foldersTable.id })
+      .from(foldersTable)
+      .where(
+        and(
+          eq(foldersTable.name, body.data.name),
+          body.data.parentId
+            ? eq(foldersTable.parentId, body.data.parentId)
+            : isNull(foldersTable.parentId),
+        ),
+      );
+
+    if (duplicate) {
+      res.status(409).json({ error: "A folder with this name already exists in this location" });
+      return;
+    }
+
     const [folder] = await db
       .insert(foldersTable)
       .values({
@@ -260,6 +277,30 @@ router.patch("/folders/:folderId", async (req, res) => {
     const updates: Partial<{ name: string; description: string }> = {};
     if (body.data.name !== undefined) updates.name = body.data.name;
     if (body.data.description !== undefined) updates.description = body.data.description;
+
+    if (body.data.name !== undefined) {
+      const [existing] = await db
+        .select({ id: foldersTable.id, parentId: foldersTable.parentId })
+        .from(foldersTable)
+        .where(eq(foldersTable.id, params.data.folderId));
+      if (existing) {
+        const [dup] = await db
+          .select({ id: foldersTable.id })
+          .from(foldersTable)
+          .where(
+            and(
+              eq(foldersTable.name, body.data.name),
+              existing.parentId
+                ? eq(foldersTable.parentId, existing.parentId)
+                : isNull(foldersTable.parentId),
+            ),
+          );
+        if (dup && dup.id !== params.data.folderId) {
+          res.status(409).json({ error: "A folder with this name already exists in this location" });
+          return;
+        }
+      }
+    }
 
     const [updated] = await db
       .update(foldersTable)
