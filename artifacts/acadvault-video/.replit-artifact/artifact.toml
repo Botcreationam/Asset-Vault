@@ -1,0 +1,31 @@
+kind = "video"
+previewPath = "/acadvault-video/"
+title = "AcadVault Marketing Video"
+version = "1.0.0"
+id = "artifacts/acadvault-video"
+router = "path"
+
+[[integratedSkills]]
+name = "video-js"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/acadvault-video/" ]
+localPort = 24158
+
+[services.development]
+run = "pnpm --filter @workspace/acadvault-video run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/acadvault-video", "run", "build" ]
+publicDir = "artifacts/acadvault-video/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24158"
+BASE_PATH = "/acadvault-video/"

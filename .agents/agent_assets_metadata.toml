@@ -1,5 +1,4 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "ys7AVtnyztHqTvcUAuuZ1"
@@ -42,3 +41,39 @@ id = "h7dCD8sUfj4GrhNFZEw4J"
 uri = "file://artifacts/acadvault-mobile/assets/images/icon.png"
 type = "image"
 title = "generated_image"
+
+[[generated]]
+id = "TxkFUFY8pFJqKOY4VXI5d"
+uri = "file://public/images/bg-abstract.png"
+type = "image"
+title = "Abstract dark blue academic background"
+
+[[generated]]
+id = "jNljmGj1vONfeeV_M4bj5"
+uri = "file://public/images/vault-icon.png"
+type = "image"
+title = "Gold vault icon"
+
+[[generated]]
+id = "ERhKenzi18pr8vMg99ASV"
+uri = "file://public/images/app-mockup.png"
+type = "image"
+title = "Mobile app mockup"
+
+[[generated]]
+id = "44BQzkeNXwnJO-3RkyY3O"
+uri = "file://artifacts/acadvault-video/public/images/library-bg.png"
+type = "image"
+title = "Dark atmospheric library background"
+
+[[generated]]
+id = "sb75b3BcxZX7rOh036-_S"
+uri = "file://artifacts/acadvault-video/public/images/floating-elements.png"
+type = "image"
+title = "Floating academic elements"
+
+[[outputs]]
+id = "PNebNNCX9vsUyx3hs4ItG"
+uri = "file://artifacts/acadvault-video/public/images/students.jpg"
+type = "image"
+title = "university students studying"
