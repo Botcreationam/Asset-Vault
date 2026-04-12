@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 223 48% 8%; /* #0B1120 */
+    --foreground: 184 64% 88%; /* #CDF0F3 */
+    
+    --primary: 224 54% 17%; /* #142042 */
+    --primary-foreground: 0 0% 100%;
+    
+    --accent: 43 83% 46%; /* #D9A014 */
+    --accent-foreground: 0 0% 100%;
+
+    --secondary: 184 64% 88%; /* #CDF0F3 */
+    --secondary-foreground: 223 48% 8%;
+
+    --font-display: 'Plus Jakarta Sans', sans-serif;
+    --font-body: 'Libre Baskerville', serif;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-body);
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+}
