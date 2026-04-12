@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/mobile/"
+title = "AcadVault Mobile"
+version = "1.0.0"
+id = "artifacts/acadvault-mobile"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/mobile/" ]
+localPort = 20808
+
+[services.development]
+run = "pnpm --filter @workspace/acadvault-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/acadvault-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/acadvault-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "20808"
+BASE_PATH = "/mobile/"

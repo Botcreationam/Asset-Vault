@@ -36,3 +36,9 @@ id = "y6MkgSCUqAuU-h-x5v5cj"
 uri = "file://attached_assets/generated_images/acadvault_logo_6.png"
 type = "image"
 title = "Hexagon lock minimal icon"
+
+[[generated]]
+id = "h7dCD8sUfj4GrhNFZEw4J"
+uri = "file://artifacts/acadvault-mobile/assets/images/icon.png"
+type = "image"
+title = "generated_image"
