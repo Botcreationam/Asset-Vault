@@ -4,6 +4,7 @@ import {
   resourcesTable,
   unitsTransactionsTable,
   userUnitsTable,
+  userActiveSessionsTable,
 } from "@workspace/db/schema";
 import {
   ListResourcesQueryParams,
@@ -21,6 +22,11 @@ import { objectStorageClient } from "../lib/objectStorage";
 import { ensureUserUnits } from "./units";
 import { logAudit } from "../lib/audit";
 import { downloadRateLimit } from "../lib/rate-limit";
+import {
+  checkSuspiciousActivity,
+  enforceDeviceLimit,
+  contentSecurityHeaders,
+} from "../lib/content-protection";
 
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
@@ -334,22 +340,22 @@ router.get("/resources/:resourceId/view", async (req, res) => {
 });
 
 // ── Secure stream proxy (no raw GCS URL exposed to browser) ─────────────────
-router.get("/resources/:resourceId/stream", async (req, res) => {
+router.get("/resources/:resourceId/stream", enforceDeviceLimit, contentSecurityHeaders, async (req, res) => {
   try {
-    if (!req.isAuthenticated()) {
-      res.status(401).send("Authentication required");
-      return;
-    }
-
     const resourceId = req.params.resourceId;
     if (!resourceId) {
       res.status(400).send("Missing resource ID");
       return;
     }
 
-    // Rate limit: max 60 streams per user per resource per hour
     if (!checkStreamRateLimit(req.user.id, resourceId)) {
       res.status(429).send("Too many requests. Please try again later.");
+      return;
+    }
+
+    const suspiciousCheck = checkSuspiciousActivity(req.user.id, resourceId);
+    if (!suspiciousCheck.allowed) {
+      res.status(403).send(suspiciousCheck.reason);
       return;
     }
 
@@ -375,33 +381,48 @@ router.get("/resources/:resourceId/stream", async (req, res) => {
 
     const [metadata] = await file.getMetadata();
     const contentType = (metadata.contentType as string) || resource.mimeType || "application/octet-stream";
+    const fileSize = Number(metadata.size) || 0;
 
-    // Security headers — inline only, no download, no caching
     res.setHeader("Content-Type", contentType);
     res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(resource.name)}"`);
-    res.setHeader("Cache-Control", "private, no-store, no-cache, must-revalidate");
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("X-Frame-Options", "SAMEORIGIN");
-    // Tell the browser not to offer a download button for this response
-    res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'none';");
+    res.setHeader("Accept-Ranges", "bytes");
 
-    if (metadata.size) {
-      res.setHeader("Content-Length", String(metadata.size));
+    const rangeHeader = req.headers.range;
+    if (rangeHeader && fileSize > 0) {
+      const parts = rangeHeader.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+      if (start >= fileSize || end >= fileSize || start > end) {
+        res.status(416).setHeader("Content-Range", `bytes */${fileSize}`).send("Range not satisfiable");
+        return;
+      }
+
+      res.status(206);
+      res.setHeader("Content-Range", `bytes ${start}-${end}/${fileSize}`);
+      res.setHeader("Content-Length", String(end - start + 1));
+
+      const readStream = file.createReadStream({ start, end });
+      readStream.on("error", (err) => {
+        req.log.error({ err }, "Stream range error");
+        if (!res.headersSent) res.status(500).send("Stream error");
+      });
+      readStream.pipe(res);
+    } else {
+      if (fileSize) res.setHeader("Content-Length", String(fileSize));
+
+      const readStream = file.createReadStream();
+      readStream.on("error", (err) => {
+        req.log.error({ err }, "Stream error");
+        if (!res.headersSent) res.status(500).send("Stream error");
+      });
+      readStream.pipe(res);
     }
 
-    // Increment view count (fire-and-forget)
     db.update(resourcesTable)
       .set({ viewCount: resource.viewCount + 1 })
       .where(eq(resourcesTable.id, resource.id))
       .catch(() => {});
-
-    // Stream file directly from GCS to the response
-    const readStream = file.createReadStream();
-    readStream.on("error", (err) => {
-      req.log.error({ err }, "Stream error");
-      if (!res.headersSent) res.status(500).send("Stream error");
-    });
-    readStream.pipe(res);
   } catch (err) {
     req.log.error({ err }, "Failed to stream resource");
     if (!res.headersSent) res.status(500).send("Internal server error");
@@ -515,5 +536,56 @@ router.get("/admin/resources", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+router.get("/user/active-sessions", async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const cutoff = new Date(Date.now() - 30 * 60 * 1000);
+    const sessions = await db
+      .select({
+        id: userActiveSessionsTable.id,
+        deviceFingerprint: userActiveSessionsTable.deviceFingerprint,
+        ipAddress: userActiveSessionsTable.ipAddress,
+        userAgent: userActiveSessionsTable.userAgent,
+        lastActiveAt: userActiveSessionsTable.lastActiveAt,
+        createdAt: userActiveSessionsTable.createdAt,
+      })
+      .from(userActiveSessionsTable)
+      .where(
+        and(
+          eq(userActiveSessionsTable.userId, req.user.id),
+          sql`${userActiveSessionsTable.lastActiveAt} >= ${cutoff}`,
+        ),
+      )
+      .orderBy(desc(userActiveSessionsTable.lastActiveAt));
+
+    res.json({
+      sessions: sessions.map((s) => ({
+        id: s.id,
+        device: parseUserAgent(s.userAgent || ""),
+        ipAddress: s.ipAddress,
+        lastActive: s.lastActiveAt,
+        startedAt: s.createdAt,
+      })),
+      maxAllowed: 3,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to get active sessions");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+function parseUserAgent(ua: string): string {
+  if (ua.includes("Chrome") && !ua.includes("Edg")) return "Chrome";
+  if (ua.includes("Firefox")) return "Firefox";
+  if (ua.includes("Safari") && !ua.includes("Chrome")) return "Safari";
+  if (ua.includes("Edg")) return "Edge";
+  if (ua.includes("Mobile")) return "Mobile Browser";
+  return "Browser";
+}
 
 export default router;
