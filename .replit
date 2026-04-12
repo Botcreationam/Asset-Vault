@@ -33,6 +33,9 @@ channel = "stable-25_05"
 [userenv.development]
 EXPO_PUBLIC_DOMAIN = "313a1de7-7786-45a3-a57b-ae471f05c147-00-35whqx513ynb8.riker.replit.dev"
 
+[userenv.shared]
+ADMIN_EMAILS = "frankmwalu04@gmail.com"
+
 [[ports]]
 localPort = 8080
 externalPort = 8080
