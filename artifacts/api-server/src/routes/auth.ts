@@ -14,6 +14,7 @@ import {
 } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { z } from "zod";
+import { authRateLimit, uploadRateLimit } from "../lib/rate-limit";
 
 const OIDC_COOKIE_TTL = 10 * 60 * 1000;
 const WELCOME_UNITS = 50;
@@ -200,7 +201,7 @@ router.patch("/auth/profile", async (req: Request, res: Response) => {
   res.json({ success: true, user: updated });
 });
 
-router.get("/login", async (req: Request, res: Response) => {
+router.get("/login", authRateLimit, async (req: Request, res: Response) => {
   const config = await getOidcConfig();
   const callbackUrl = `${getOrigin(req)}/api/callback`;
 
@@ -295,7 +296,7 @@ router.get("/callback", async (req: Request, res: Response) => {
   res.redirect(returnTo);
 });
 
-router.post("/auth/profile-photo", async (req: Request, res: Response) => {
+router.post("/auth/profile-photo", uploadRateLimit, async (req: Request, res: Response) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "Not authenticated" });
     return;

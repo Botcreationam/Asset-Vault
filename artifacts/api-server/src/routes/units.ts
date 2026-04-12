@@ -13,8 +13,9 @@ import {
   AdminUpdateUserRoleBody,
   AdminUpdateUserRoleParams,
 } from "@workspace/api-zod";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { logAudit } from "../lib/audit";
+import { topupRateLimit } from "../lib/rate-limit";
 
 const router: IRouter = Router();
 
@@ -72,10 +73,15 @@ router.get("/units/transactions", async (req, res) => {
   }
 });
 
-router.post("/units/topup", async (req, res) => {
+router.post("/units/topup", topupRateLimit, async (req, res) => {
   try {
     if (!req.isAuthenticated()) {
       res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    if (req.user.role !== "admin") {
+      res.status(403).json({ error: "Self-service topup is disabled. Contact an admin to receive units." });
       return;
     }
 
@@ -86,29 +92,32 @@ router.post("/units/topup", async (req, res) => {
     }
 
     const { amount } = body.data;
-    if (amount <= 0 || amount > 10000) {
-      res.status(400).json({ error: "Invalid amount" });
+    if (amount <= 0 || amount > 1000) {
+      res.status(400).json({ error: "Invalid amount (max 1000)" });
       return;
     }
 
-    const currentBalance = await ensureUserUnits(req.user.id);
+    await ensureUserUnits(req.user.id);
 
-    await db
-      .insert(userUnitsTable)
-      .values({ userId: req.user.id, balance: currentBalance + amount })
-      .onConflictDoUpdate({
-        target: userUnitsTable.userId,
-        set: { balance: currentBalance + amount, updatedAt: new Date() },
-      });
+    const [updated] = await db
+      .update(userUnitsTable)
+      .set({
+        balance: sql`${userUnitsTable.balance} + ${amount}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(userUnitsTable.userId, req.user.id))
+      .returning({ balance: userUnitsTable.balance });
 
     await db.insert(unitsTransactionsTable).values({
       userId: req.user.id,
       type: "credit",
       amount,
-      description: `Top-up of ${amount} units`,
+      description: `Admin self top-up of ${amount} units`,
     });
 
-    res.json({ balance: currentBalance + amount });
+    await logAudit("grant_units", req.user.id, req.user.id, { amount, selfTopup: true });
+
+    res.json({ balance: updated?.balance ?? 0 });
   } catch (err) {
     req.log.error({ err }, "Failed to top up units");
     res.status(500).json({ error: "Internal server error" });
@@ -211,16 +220,16 @@ router.post("/admin/users/:userId/units", async (req, res) => {
     }
 
     const { amount, description } = body.data;
-    const currentBalance = await ensureUserUnits(params.data.userId);
-    const newBalance = currentBalance + amount;
+    await ensureUserUnits(params.data.userId);
 
-    await db
-      .insert(userUnitsTable)
-      .values({ userId: params.data.userId, balance: newBalance })
-      .onConflictDoUpdate({
-        target: userUnitsTable.userId,
-        set: { balance: newBalance, updatedAt: new Date() },
-      });
+    const [updated] = await db
+      .update(userUnitsTable)
+      .set({
+        balance: sql`${userUnitsTable.balance} + ${amount}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(userUnitsTable.userId, params.data.userId))
+      .returning({ balance: userUnitsTable.balance });
 
     await db.insert(unitsTransactionsTable).values({
       userId: params.data.userId,
@@ -234,7 +243,7 @@ router.post("/admin/users/:userId/units", async (req, res) => {
       description,
     });
 
-    res.json({ balance: newBalance });
+    res.json({ balance: updated?.balance ?? 0 });
   } catch (err) {
     req.log.error({ err }, "Failed to grant units");
     res.status(500).json({ error: "Internal server error" });

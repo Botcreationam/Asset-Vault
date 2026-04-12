@@ -68,6 +68,17 @@ artifacts-monorepo/
 8. **Real-Time Chat**: Direct messaging between users with WebSocket-powered live updates
 9. **Profile Photos**: Upload profile photos (max 2MB; JPEG/PNG/GIF/WebP only) from the account page
 
+## Security
+
+- **Rate Limiting**: All write endpoints rate-limited (posts: 10/min, comments: 30/min, reactions: 60/min, messages: 60/min, uploads: 5/5min, downloads: 10/min, global: 200/min per user)
+- **CORS**: Restricted to known Replit origins only (not `origin: true`)
+- **Security Headers**: X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy on all responses
+- **Atomic Balance Operations**: Download deductions use SQL `WHERE balance >= cost` to prevent race conditions
+- **Input Validation**: Post max 2000 chars, comment max 1000 chars, message max 5000 chars, MIME validation on uploads
+- **WebSocket Protection**: Max 5 connections per user, session-cookie auth required
+- **Self-Service Topup Disabled**: Only admins can topup units; prevents free-unit abuse
+- **Search Sanitization**: LIKE wildcards (`%`, `_`) stripped from search input
+
 ## API Routes
 
 All routes at `/api`:

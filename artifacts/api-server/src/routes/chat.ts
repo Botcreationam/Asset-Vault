@@ -7,8 +7,11 @@ import {
 } from "@workspace/db/schema";
 import { eq, and, desc, lt, ne, sql, inArray } from "drizzle-orm";
 import { sendToUser } from "../lib/websocket";
+import { messageRateLimit } from "../lib/rate-limit";
 
 const router: IRouter = Router();
+
+const MAX_MESSAGE_LENGTH = 5000;
 
 router.get("/chat/users", async (req, res) => {
   if (!req.isAuthenticated()) {
@@ -134,13 +137,23 @@ router.post("/chat/conversations", async (req, res) => {
   }
 
   const { userId } = req.body;
-  if (!userId) {
+  if (!userId || typeof userId !== "string") {
     res.status(400).json({ error: "userId is required" });
     return;
   }
 
   if (userId === req.user!.id) {
     res.status(400).json({ error: "Cannot start conversation with yourself" });
+    return;
+  }
+
+  const [targetUser] = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId));
+
+  if (!targetUser) {
+    res.status(404).json({ error: "User not found" });
     return;
   }
 
@@ -279,7 +292,7 @@ router.get("/chat/conversations/:conversationId/messages", async (req, res) => {
   });
 });
 
-router.post("/chat/conversations/:conversationId/messages", async (req, res) => {
+router.post("/chat/conversations/:conversationId/messages", messageRateLimit, async (req, res) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "Not authenticated" });
     return;
@@ -290,6 +303,11 @@ router.post("/chat/conversations/:conversationId/messages", async (req, res) => 
 
   if (!content || typeof content !== "string" || content.trim().length === 0) {
     res.status(400).json({ error: "Content is required" });
+    return;
+  }
+
+  if (content.length > MAX_MESSAGE_LENGTH) {
+    res.status(400).json({ error: `Message too long (max ${MAX_MESSAGE_LENGTH} chars)` });
     return;
   }
 
