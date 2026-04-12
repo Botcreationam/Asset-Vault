@@ -1,0 +1,20 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "ys7AVtnyztHqTvcUAuuZ1"
+uri = "file://attached_assets/generated_images/acadvault_logo_1.png"
+type = "image"
+title = "AcadVault logo icon vault book"
+
+[[generated]]
+id = "TUX-1mc1PQmuFfTeh34se"
+uri = "file://attached_assets/generated_images/acadvault_logo_2.png"
+type = "image"
+title = "AcadVault book keyhole icon"
+
+[[generated]]
+id = "66cL6h7Ez3VR2JkvwAaDK"
+uri = "file://attached_assets/generated_images/acadvault_logo_3.png"
+type = "image"
+title = "AcadVault shield book crest"
