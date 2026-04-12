@@ -55,7 +55,7 @@ function getSafeReturnTo(value: unknown): string {
   return value;
 }
 
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "frankmwalu04@gmail.com")
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
   .split(",")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);

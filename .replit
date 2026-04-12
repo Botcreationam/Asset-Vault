@@ -32,3 +32,27 @@ channel = "stable-25_05"
 
 [userenv.development]
 EXPO_PUBLIC_DOMAIN = "313a1de7-7786-45a3-a57b-ae471f05c147-00-35whqx513ynb8.riker.replit.dev"
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 8081
+externalPort = 8081
+
+[[ports]]
+localPort = 8082
+externalPort = 3003
+
+[[ports]]
+localPort = 20808
+externalPort = 3001
+
+[[ports]]
+localPort = 22689
+externalPort = 3000
+
+[[ports]]
+localPort = 22690
+externalPort = 3002

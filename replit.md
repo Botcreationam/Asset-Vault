@@ -184,7 +184,9 @@ Run codegen: `pnpm --filter @workspace/api-spec run codegen`
 
 ## Admin Setup
 
-To make the first admin user:
+Admin users are determined by the `ADMIN_EMAILS` environment variable (comma-separated list of email addresses). If not set, no users are auto-promoted to admin on login.
+
+To manually make the first admin user:
 ```sql
 UPDATE users SET role = 'admin' WHERE id = '<your-replit-user-id>';
 ```
