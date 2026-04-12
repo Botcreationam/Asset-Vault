@@ -18,3 +18,21 @@ id = "66cL6h7Ez3VR2JkvwAaDK"
 uri = "file://attached_assets/generated_images/acadvault_logo_3.png"
 type = "image"
 title = "AcadVault shield book crest"
+
+[[generated]]
+id = "HmV3IRFmGZDPwPBpEymeD"
+uri = "file://attached_assets/generated_images/acadvault_logo_4.png"
+type = "image"
+title = "AV monogram minimal logo"
+
+[[generated]]
+id = "q7obIOKdw1Ngc3k4wUY8u"
+uri = "file://attached_assets/generated_images/acadvault_logo_5.png"
+type = "image"
+title = "Vault door book minimal icon"
+
+[[generated]]
+id = "y6MkgSCUqAuU-h-x5v5cj"
+uri = "file://attached_assets/generated_images/acadvault_logo_6.png"
+type = "image"
+title = "Hexagon lock minimal icon"
