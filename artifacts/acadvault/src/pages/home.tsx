@@ -160,14 +160,14 @@ export default function Home() {
   return (
     <div className="flex flex-col gap-10 pb-12">
       {/* Hero Section */}
-      <section className="relative rounded-3xl overflow-hidden shadow-2xl bg-primary text-primary-foreground min-h-[420px] flex items-center">
+      <section className="relative rounded-3xl overflow-hidden shadow-2xl bg-[#142042] text-white min-h-[420px] flex items-center">
         <div className="absolute inset-0 z-0">
           <img
             src={`${BASE}images/hero-bg.png`}
             alt="Library background"
             className="w-full h-full object-cover opacity-30 mix-blend-overlay"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/90 to-primary/40" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#142042]/95 to-[#142042]/50" />
         </div>
 
         <div className="relative z-10 px-8 md:px-16 py-12 max-w-3xl">
@@ -182,7 +182,7 @@ export default function Home() {
             <h1 className="font-serif text-4xl md:text-5xl font-bold leading-tight mb-6 text-white">
               Unlock the Knowledge You Need to Succeed.
             </h1>
-            <p className="text-lg text-primary-foreground/80 mb-8 max-w-2xl leading-relaxed">
+            <p className="text-lg text-white/80 mb-8 max-w-2xl leading-relaxed">
               AcadVault provides secure access to verified academic resources. Read online for free, or use your units to download materials for offline study.
             </p>
 
