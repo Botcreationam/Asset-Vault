@@ -1,11 +1,10 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
-import { clerkMiddleware } from "@clerk/express";
-import { CLERK_PROXY_PATH, clerkProxyMiddleware } from "./middlewares/clerkProxyMiddleware";
+import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
 import { logger } from "./lib/logger";
-import { populateUser } from "./middlewares/clerkAuth";
 
 const app: Express = express();
 
@@ -29,37 +28,11 @@ app.use(
   }),
 );
 
-// Clerk proxy must come before body parsers (streams raw bytes)
-app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
-
-const allowedOrigins = new Set(
-  [
-    process.env.REPLIT_DEV_DOMAIN && `https://${process.env.REPLIT_DEV_DOMAIN}`,
-    process.env.REPLIT_DOMAINS?.split(",").map((d) => `https://${d.trim()}`),
-    process.env.REPLIT_EXPO_DEV_DOMAIN && `https://${process.env.REPLIT_EXPO_DEV_DOMAIN}`,
-  ]
-    .flat()
-    .filter(Boolean) as string[],
-);
-
-app.use(
-  cors({
-    credentials: true,
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.has(origin)) {
-        callback(null, origin || true);
-      } else {
-        callback(null, false);
-      }
-    },
-  }),
-);
-
+app.use(cors({ credentials: true, origin: true }));
+app.use(cookieParser());
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
-
-app.use(clerkMiddleware());
-app.use(populateUser);
+app.use(authMiddleware);
 
 app.use((_req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");

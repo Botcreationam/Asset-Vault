@@ -1,13 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { BASE_URL } from "@/lib/api";
-import { getAuthToken } from "@workspace/api-client-react";
-
-async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  const token = await getAuthToken();
-  const headers = new Headers(options.headers);
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  return fetch(url, { ...options, credentials: "include", headers });
-}
+import { authFetch, BASE_URL } from "@/lib/api";
 
 export interface AppNotification {
   id: number;

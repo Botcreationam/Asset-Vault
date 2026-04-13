@@ -17,11 +17,11 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
-- **Auth**: Clerk (JWT sessions) — `@clerk/express` on backend, `@clerk/react` on frontend
-  - **Token delivery**: Bearer token via `Authorization: Bearer <token>` header (more reliable than cookies through Replit's proxy)
-  - `ClerkAuthSync` component in `App.tsx` registers `session.getToken()` as global auth getter via `setAuthTokenGetter`
-  - All API calls use `authFetch` (from `@/lib/api`) which auto-attaches the Bearer token
-  - `use-auth.ts` passes token directly for the initial `/api/auth/user` call
+- **Auth**: Replit Auth (OIDC/PKCE) — `openid-client` v6 on backend, `@workspace/replit-auth-web` on frontend
+  - Cookie-based sessions stored in PostgreSQL `sessions` table
+  - `authMiddleware` loads user from session on every request; augments `req.user` with fresh `role` + `unitsBalance` from DB
+  - All API calls use `authFetch` (from `@/lib/api`) with `credentials: "include"` for session cookies
+  - WebSocket auth reads session cookie from the HTTP upgrade request headers
 - **File Storage**: Google Cloud Storage (Replit App Storage) via `@google-cloud/storage`
 - **Frontend**: React + Vite + Tailwind CSS + shadcn/ui
 

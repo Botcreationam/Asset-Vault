@@ -1,23 +1,21 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { Server } from "http";
-import { createClerkClient } from "@clerk/express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-
-const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+import { SESSION_COOKIE, getSession } from "./auth";
+import { parse as parseCookies } from "cookie";
 
 const userConnections = new Map<string, Set<WebSocket>>();
 const MAX_CONNECTIONS_PER_USER = 5;
 
 async function getUserIdFromRequest(req: any): Promise<string | null> {
   try {
-    const requestState = await clerkClient.authenticateRequest(req, {
-      secretKey: process.env.CLERK_SECRET_KEY,
-    });
-    if (!requestState.isSignedIn) return null;
-    const auth = requestState.toAuth();
-    const userId = (auth?.sessionClaims?.userId as string | undefined) || auth?.userId;
-    return userId || null;
+    const cookieHeader = req.headers?.cookie || "";
+    const cookies = parseCookies(cookieHeader);
+    const sid = cookies[SESSION_COOKIE];
+    if (!sid) return null;
+    const session = await getSession(sid);
+    return session?.user?.id ?? null;
   } catch {
     return null;
   }

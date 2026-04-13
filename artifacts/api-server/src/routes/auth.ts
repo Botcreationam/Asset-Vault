@@ -1,124 +1,326 @@
+import * as oidc from "openid-client";
 import { Router, type IRouter, type Request, type Response } from "express";
+import { z } from "zod/v4";
+import { GetCurrentAuthUserResponse } from "@workspace/api-zod";
 import { db, usersTable } from "@workspace/db";
-import { userUnitsTable } from "@workspace/db/schema";
+import { userUnitsTable, unitsTransactionsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
-import { z } from "zod";
-import { uploadRateLimit } from "../lib/rate-limit";
+import {
+  clearSession,
+  getOidcConfig,
+  getSessionId,
+  createSession,
+  deleteSession,
+  SESSION_COOKIE,
+  SESSION_TTL,
+  ISSUER_URL,
+  type SessionData,
+} from "../lib/auth";
 import { logAudit } from "../lib/audit";
+
+const ExchangeMobileAuthorizationCodeBody = z.object({
+  code: z.string(),
+  code_verifier: z.string(),
+  state: z.string(),
+  nonce: z.string().optional(),
+  redirect_uri: z.string(),
+});
+
+const ExchangeMobileAuthorizationCodeResponse = z.object({ token: z.string() });
+
+const LogoutMobileSessionResponse = z.object({ success: z.boolean() });
+
+const WELCOME_UNITS = 50;
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
+const OIDC_COOKIE_TTL = 10 * 60 * 1000;
 
 const router: IRouter = Router();
 
-router.get("/auth/user", async (req: Request, res: Response) => {
-  if (!req.isAuthenticated()) {
-    res.json({ authenticated: false });
-    return;
-  }
+function getOrigin(req: Request): string {
+  const proto = req.headers["x-forwarded-proto"] || "https";
+  const host =
+    req.headers["x-forwarded-host"] || req.headers["host"] || "localhost";
+  return `${proto}://${host}`;
+}
 
-  const [unitsRow] = await db
-    .select({ balance: userUnitsTable.balance })
-    .from(userUnitsTable)
-    .where(eq(userUnitsTable.userId, req.user!.id));
-
-  res.json({
-    authenticated: true,
-    user: {
-      ...req.user,
-      unitsBalance: unitsRow?.balance ?? 0,
-    },
+function setSessionCookie(res: Response, sid: string) {
+  res.cookie(SESSION_COOKIE, sid, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_TTL,
   });
-});
+}
 
-const UpdateProfileBody = z.object({
-  username: z.string().min(2).max(50).optional(),
-  firstName: z.string().min(1).max(50).optional(),
-  lastName: z.string().min(1).max(50).optional(),
-});
+function setOidcCookie(res: Response, name: string, value: string) {
+  res.cookie(name, value, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: OIDC_COOKIE_TTL,
+  });
+}
 
-router.patch("/auth/profile", async (req: Request, res: Response) => {
-  if (!req.isAuthenticated()) {
-    res.status(401).json({ error: "Authentication required" });
-    return;
+function getSafeReturnTo(value: unknown): string {
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
+    return "/";
   }
+  return value;
+}
 
-  const body = UpdateProfileBody.safeParse(req.body);
-  if (!body.success) {
-    res.status(400).json({ error: "Invalid data", details: body.error.flatten() });
-    return;
-  }
+async function grantWelcomeUnits(userId: string) {
+  const [existing] = await db
+    .select({ userId: userUnitsTable.userId })
+    .from(userUnitsTable)
+    .where(eq(userUnitsTable.userId, userId));
+  if (existing) return;
+  await db.insert(userUnitsTable).values({ userId, balance: WELCOME_UNITS }).onConflictDoNothing();
+  await db.insert(unitsTransactionsTable).values({
+    userId,
+    type: "credit",
+    amount: WELCOME_UNITS,
+    description: `Welcome bonus — ${WELCOME_UNITS} free units to get you started`,
+  });
+  await logAudit("units_welcome", userId, userId, { amount: WELCOME_UNITS });
+}
 
-  const updates: Partial<{ username: string; firstName: string; lastName: string; updatedAt: Date }> = {
-    updatedAt: new Date(),
-  };
-  if (body.data.username !== undefined) updates.username = body.data.username;
-  if (body.data.firstName !== undefined) updates.firstName = body.data.firstName;
-  if (body.data.lastName !== undefined) updates.lastName = body.data.lastName;
+async function upsertUser(claims: Record<string, unknown>) {
+  const id = claims.sub as string;
+  const email = ((claims.email as string) || null)?.toLowerCase() ?? null;
+  const isAdmin = email ? ADMIN_EMAILS.includes(email) : false;
 
-  if (body.data.username) {
-    const [taken] = await db
-      .select({ id: usersTable.id })
-      .from(usersTable)
-      .where(eq(usersTable.username, body.data.username));
-    if (taken && taken.id !== req.user!.id) {
-      res.status(409).json({ error: "Username is already taken" });
-      return;
+  const [existing] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+
+  if (existing) {
+    if (isAdmin && existing.role !== "admin") {
+      await db.update(usersTable).set({ role: "admin" }).where(eq(usersTable.id, id));
+      existing.role = "admin";
     }
+    return existing;
   }
 
-  const [updated] = await db
-    .update(usersTable)
-    .set(updates)
-    .where(eq(usersTable.id, req.user!.id))
+  const userData = {
+    id,
+    email,
+    firstName: (claims.first_name as string) || null,
+    lastName: (claims.last_name as string) || null,
+    profileImageUrl: ((claims.profile_image_url || claims.picture) as string) || null,
+    username: (claims.username as string) || null,
+    role: isAdmin ? ("admin" as const) : ("student" as const),
+  };
+
+  const [user] = await db
+    .insert(usersTable)
+    .values(userData)
+    .onConflictDoUpdate({
+      target: usersTable.id,
+      set: { ...userData, updatedAt: new Date() },
+    })
     .returning();
 
-  await logAudit("profile_update", req.user!.id, req.user!.id, {
-    fields: Object.keys(body.data),
-  });
+  await grantWelcomeUnits(user.id);
+  await logAudit("user_registered", user.id, user.id, { email, role: userData.role });
 
-  res.json({ success: true, user: updated });
+  return user;
+}
+
+router.get("/auth/user", (req: Request, res: Response) => {
+  const authenticated = req.isAuthenticated();
+  res.json(
+    GetCurrentAuthUserResponse.parse({
+      authenticated,
+      user: authenticated ? req.user : undefined,
+    }),
+  );
 });
 
-router.post("/auth/profile-photo", uploadRateLimit, async (req: Request, res: Response) => {
-  if (!req.isAuthenticated()) {
-    res.status(401).json({ error: "Not authenticated" });
+router.get("/login", async (req: Request, res: Response) => {
+  const config = await getOidcConfig();
+  const callbackUrl = `${getOrigin(req)}/api/callback`;
+
+  const returnTo = getSafeReturnTo(req.query.returnTo);
+
+  const state = oidc.randomState();
+  const nonce = oidc.randomNonce();
+  const codeVerifier = oidc.randomPKCECodeVerifier();
+  const codeChallenge = await oidc.calculatePKCECodeChallenge(codeVerifier);
+
+  const redirectTo = oidc.buildAuthorizationUrl(config, {
+    redirect_uri: callbackUrl,
+    scope: "openid email profile offline_access",
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
+    prompt: "login consent",
+    state,
+    nonce,
+  });
+
+  setOidcCookie(res, "code_verifier", codeVerifier);
+  setOidcCookie(res, "nonce", nonce);
+  setOidcCookie(res, "state", state);
+  setOidcCookie(res, "return_to", returnTo);
+
+  res.redirect(redirectTo.href);
+});
+
+// Query params are not validated because the OIDC provider may include
+// parameters not expressed in the schema.
+router.get("/callback", async (req: Request, res: Response) => {
+  const config = await getOidcConfig();
+  const callbackUrl = `${getOrigin(req)}/api/callback`;
+
+  const codeVerifier = req.cookies?.code_verifier;
+  const nonce = req.cookies?.nonce;
+  const expectedState = req.cookies?.state;
+
+  if (!codeVerifier || !expectedState) {
+    res.redirect("/api/login");
     return;
   }
 
-  const multer = (await import("multer")).default;
-  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } }).single("photo");
+  const currentUrl = new URL(
+    `${callbackUrl}?${new URL(req.url, `http://${req.headers.host}`).searchParams}`,
+  );
 
-  upload(req, res, async (err: any) => {
-    if (err) {
-      res.status(400).json({ error: "Upload failed: " + err.message });
+  let tokens: oidc.TokenEndpointResponse & oidc.TokenEndpointResponseHelpers;
+  try {
+    tokens = await oidc.authorizationCodeGrant(config, currentUrl, {
+      pkceCodeVerifier: codeVerifier,
+      expectedNonce: nonce,
+      expectedState,
+      idTokenExpected: true,
+    });
+  } catch {
+    res.redirect("/api/login");
+    return;
+  }
+
+  const returnTo = getSafeReturnTo(req.cookies?.return_to);
+
+  res.clearCookie("code_verifier", { path: "/" });
+  res.clearCookie("nonce", { path: "/" });
+  res.clearCookie("state", { path: "/" });
+  res.clearCookie("return_to", { path: "/" });
+
+  const claims = tokens.claims();
+  if (!claims) {
+    res.redirect("/api/login");
+    return;
+  }
+
+  const dbUser = await upsertUser(
+    claims as unknown as Record<string, unknown>,
+  );
+
+  const now = Math.floor(Date.now() / 1000);
+  const sessionData: SessionData = {
+    user: {
+      id: dbUser.id,
+      email: dbUser.email,
+      firstName: dbUser.firstName,
+      lastName: dbUser.lastName,
+      profileImageUrl: dbUser.profileImageUrl,
+      role: (dbUser.role ?? "student") as "student" | "moderator" | "admin",
+      unitsBalance: 0,
+    },
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    expires_at: tokens.expiresIn() ? now + tokens.expiresIn()! : claims.exp,
+  };
+
+  const sid = await createSession(sessionData);
+  setSessionCookie(res, sid);
+  res.redirect(returnTo);
+});
+
+router.get("/logout", async (req: Request, res: Response) => {
+  const config = await getOidcConfig();
+  const origin = getOrigin(req);
+
+  const sid = getSessionId(req);
+  await clearSession(res, sid);
+
+  const endSessionUrl = oidc.buildEndSessionUrl(config, {
+    client_id: process.env.REPL_ID!,
+    post_logout_redirect_uri: origin,
+  });
+
+  res.redirect(endSessionUrl.href);
+});
+
+router.post(
+  "/mobile-auth/token-exchange",
+  async (req: Request, res: Response) => {
+    const parsed = ExchangeMobileAuthorizationCodeBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Missing or invalid required parameters" });
       return;
     }
 
+    const { code, code_verifier, redirect_uri, state, nonce } = parsed.data;
+
     try {
-      const file = (req as any).file;
-      if (!file) {
-        res.status(400).json({ error: "No file uploaded" });
+      const config = await getOidcConfig();
+
+      const callbackUrl = new URL(redirect_uri);
+      callbackUrl.searchParams.set("code", code);
+      callbackUrl.searchParams.set("state", state);
+      callbackUrl.searchParams.set("iss", ISSUER_URL);
+
+      const tokens = await oidc.authorizationCodeGrant(config, callbackUrl, {
+        pkceCodeVerifier: code_verifier,
+        expectedNonce: nonce ?? undefined,
+        expectedState: state,
+        idTokenExpected: true,
+      });
+
+      const claims = tokens.claims();
+      if (!claims) {
+        res.status(401).json({ error: "No claims in ID token" });
         return;
       }
 
-      const allowedMimes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-      if (!allowedMimes.includes(file.mimetype)) {
-        res.status(400).json({ error: "Only JPEG, PNG, GIF, and WebP images are allowed" });
-        return;
-      }
+      const dbUser = await upsertUser(
+        claims as unknown as Record<string, unknown>,
+      );
 
-      const base64 = file.buffer.toString("base64");
-      const dataUrl = `data:${file.mimetype};base64,${base64}`;
+      const now = Math.floor(Date.now() / 1000);
+      const sessionData: SessionData = {
+        user: {
+          id: dbUser.id,
+          email: dbUser.email,
+          firstName: dbUser.firstName,
+          lastName: dbUser.lastName,
+          profileImageUrl: dbUser.profileImageUrl,
+          role: (dbUser.role ?? "student") as "student" | "moderator" | "admin",
+          unitsBalance: 0,
+        },
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expires_at: tokens.expiresIn() ? now + tokens.expiresIn()! : claims.exp,
+      };
 
-      await db
-        .update(usersTable)
-        .set({ profileImageUrl: dataUrl })
-        .where(eq(usersTable.id, req.user!.id));
-
-      res.json({ profileImageUrl: dataUrl });
-    } catch (e) {
-      console.error("Profile photo upload error:", e);
-      res.status(500).json({ error: "Failed to upload photo" });
+      const sid = await createSession(sessionData);
+      res.json(ExchangeMobileAuthorizationCodeResponse.parse({ token: sid }));
+    } catch (err) {
+      req.log.error({ err }, "Mobile token exchange error");
+      res.status(500).json({ error: "Token exchange failed" });
     }
-  });
+  },
+);
+
+router.post("/mobile-auth/logout", async (req: Request, res: Response) => {
+  const sid = getSessionId(req);
+  if (sid) {
+    await deleteSession(sid);
+  }
+  res.json(LogoutMobileSessionResponse.parse({ success: true }));
 });
 
 export default router;
