@@ -23,8 +23,13 @@ import {
   Loader2,
   Download,
   FileText,
+  GraduationCap,
+  BookOpen,
+  MapPin,
+  Sparkles,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getResourceIcon } from "@/lib/resource-utils";
 import {
   Card,
@@ -278,6 +283,9 @@ export default function Account() {
           </Card>
         </div>
 
+        {/* Academic Profile */}
+        <AcademicProfile />
+
         {/* Tabs: Transactions + Downloads */}
         <Tabs defaultValue="transactions">
           <TabsList className="mb-4 h-10">
@@ -416,6 +424,144 @@ function DownloadHistory() {
                 </div>
               </Link>
             ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+const PROGRAMS = [
+  "Agriculture","Architecture","Biomedical Sciences","Business Administration","Civil Engineering",
+  "Computer Science","Dentistry","Economics","Education","Electrical Engineering",
+  "Environmental Science","Human Resource Management","Information Technology","Law","Marketing",
+  "Mathematics","Mechanical Engineering","Media Studies","Medicine","Nursing","Pharmacy",
+  "Psychology","Public Health","Social Work","Software Engineering","Statistics","Theology",
+  "Tourism & Hospitality","Other",
+];
+
+const YEARS = [
+  { value: "1", label: "1st Year" },{ value: "2", label: "2nd Year" },
+  { value: "3", label: "3rd Year" },{ value: "4", label: "4th Year" },
+  { value: "5", label: "5th Year" },{ value: "6", label: "6th Year" },
+  { value: "pg", label: "Postgraduate" },
+];
+
+const SEMESTERS = [
+  { value: "1", label: "Semester 1" },
+  { value: "2", label: "Semester 2" },
+];
+
+function AcademicProfile() {
+  const { user } = useAuth();
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [nickname, setNickname] = useState(user?.nickname || "");
+  const [program, setProgram] = useState(user?.program || "");
+  const [academicYear, setAcademicYear] = useState(user?.academicYear || "");
+  const [semester, setSemester] = useState(user?.semester || "");
+  const { toast } = useToast();
+
+  async function save() {
+    if (!nickname.trim() || !program || !academicYear || !semester) {
+      toast({ title: "All fields are required", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`${BASE_URL}api/auth/onboarding`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nickname: nickname.trim(), program, academicYear, semester }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      toast({ title: "Academic profile updated!" });
+      setEditing(false);
+    } catch {
+      toast({ title: "Failed to update profile", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="bg-card shadow-md border-border/60">
+      <CardHeader className="border-b border-border/50 pb-4 flex flex-row items-center justify-between">
+        <div>
+          <CardTitle className="flex items-center gap-2 font-serif text-xl">
+            <GraduationCap className="w-5 h-5 text-primary" /> Academic Profile
+          </CardTitle>
+          <CardDescription>Your programme details used to personalise your experience</CardDescription>
+        </div>
+        {!editing && (
+          <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={() => setEditing(true)}>
+            <Pencil className="w-3.5 h-3.5" /> Edit
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="pt-5">
+        {editing ? (
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Display Name</label>
+              <Input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="Nickname" className="h-9" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Programme</label>
+              <Select value={program} onValueChange={setProgram}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Select programme…" /></SelectTrigger>
+                <SelectContent>{PROGRAMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Academic Year</label>
+                <Select value={academicYear} onValueChange={setAcademicYear}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Year…" /></SelectTrigger>
+                  <SelectContent>{YEARS.map((y) => <SelectItem key={y.value} value={y.value}>{y.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Semester</label>
+                <Select value={semester} onValueChange={setSemester}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Semester…" /></SelectTrigger>
+                  <SelectContent>{SEMESTERS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" size="sm" className="flex-1 gap-1" onClick={() => setEditing(false)} disabled={saving}>
+                <X className="w-3.5 h-3.5" /> Cancel
+              </Button>
+              <Button size="sm" className="flex-1 gap-1" onClick={save} disabled={saving}>
+                {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</> : <><Check className="w-3.5 h-3.5" /> Save</>}
+              </Button>
+            </div>
+          </div>
+        ) : user?.onboardingCompleted ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              { icon: UserIcon, label: "Nickname", value: user?.nickname },
+              { icon: BookOpen, label: "Programme", value: user?.program },
+              { icon: GraduationCap, label: "Year", value: YEARS.find(y => y.value === user?.academicYear)?.label },
+              { icon: MapPin, label: "Semester", value: SEMESTERS.find(s => s.value === user?.semester)?.label },
+            ].map((item) => (
+              <div key={item.label} className="bg-secondary/20 rounded-xl p-3 border border-border/40">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                  <item.icon className="w-3 h-3" /> {item.label}
+                </div>
+                <p className="font-semibold text-sm text-foreground truncate">{item.value || "—"}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-6">
+            <GraduationCap className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
+            <p className="text-muted-foreground text-sm mb-3">You haven't set up your academic profile yet.</p>
+            <Button size="sm" onClick={() => setEditing(true)} className="gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" /> Set up profile
+            </Button>
           </div>
         )}
       </CardContent>

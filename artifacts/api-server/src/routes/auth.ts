@@ -201,6 +201,53 @@ router.patch("/auth/profile", async (req: Request, res: Response) => {
   res.json({ success: true, user: updated });
 });
 
+const OnboardingBody = z.object({
+  nickname: z.string().min(2).max(50),
+  program: z.string().min(2).max(100),
+  academicYear: z.string().min(1).max(20),
+  semester: z.string().min(1).max(10),
+});
+
+router.post("/auth/onboarding", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const body = OnboardingBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Invalid data", details: body.error.flatten() });
+    return;
+  }
+
+  const [updated] = await db
+    .update(usersTable)
+    .set({
+      nickname: body.data.nickname.trim(),
+      program: body.data.program.trim(),
+      academicYear: body.data.academicYear,
+      semester: body.data.semester,
+      onboardingCompleted: true,
+      updatedAt: new Date(),
+    })
+    .where(eq(usersTable.id, req.user.id))
+    .returning();
+
+  req.user.nickname = updated.nickname;
+  req.user.program = updated.program;
+  req.user.academicYear = updated.academicYear;
+  req.user.semester = updated.semester;
+  req.user.onboardingCompleted = true;
+
+  await logAudit("onboarding_completed", req.user.id, req.user.id, {
+    program: updated.program,
+    academicYear: updated.academicYear,
+    semester: updated.semester,
+  });
+
+  res.json({ success: true, user: updated });
+});
+
 router.get("/login", authRateLimit, async (req: Request, res: Response) => {
   const config = await getOidcConfig();
   const callbackUrl = `${getOrigin(req)}/api/callback`;

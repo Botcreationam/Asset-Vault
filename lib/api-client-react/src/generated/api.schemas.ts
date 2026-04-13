@@ -24,6 +24,11 @@ export interface AuthUser {
   profileImageUrl?: string;
   role: AuthUserRole;
   unitsBalance: number;
+  nickname?: string | null;
+  program?: string | null;
+  academicYear?: string | null;
+  semester?: string | null;
+  onboardingCompleted?: boolean;
 }
 
 export interface GetCurrentAuthUserResponse {
