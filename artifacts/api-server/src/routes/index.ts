@@ -10,6 +10,8 @@ import ratingsRouter from "./ratings";
 import notificationsRouter from "./notifications";
 import materialRequestsRouter from "./material-requests";
 import analyticsRouter from "./analytics";
+import bookmarksRouter from "./bookmarks";
+import discoveryRouter from "./discovery";
 import { apiRateLimit } from "../lib/rate-limit";
 
 const router: IRouter = Router();
@@ -26,5 +28,7 @@ router.use(ratingsRouter);
 router.use(notificationsRouter);
 router.use(materialRequestsRouter);
 router.use(analyticsRouter);
+router.use(bookmarksRouter);
+router.use(discoveryRouter);
 
 export default router;

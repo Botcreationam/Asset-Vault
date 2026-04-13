@@ -20,6 +20,7 @@ import {
   PackageSearch,
   CheckCheck,
   Shield,
+  Bookmark,
 } from "lucide-react";
 
 import { 
@@ -97,6 +98,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { title: "News Feed", url: "/feed", icon: Newspaper },
     { title: "Messages", url: "/chat", icon: MessageSquare },
     { title: "Request Material", url: "/material-requests", icon: PackageSearch },
+    { title: "Saved Resources", url: "/bookmarks", icon: Bookmark },
   ];
 
   const userItems = [

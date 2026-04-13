@@ -12,6 +12,7 @@ import {
   SecureViewerError,
 } from "@/components/secure-viewer";
 import { ResourceRatings } from "@/components/resource-ratings";
+import { BookmarkButton } from "@/components/bookmark-button";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
@@ -263,6 +264,8 @@ export default function ResourceDetail() {
                   <Link href="/account" className="underline underline-offset-2">Top up →</Link>
                 </p>
               )}
+
+              <BookmarkButton resourceId={resource.id} size="default" className="w-full" />
 
               {/* Security notice */}
               <div className="flex items-start gap-2 rounded-lg bg-muted/50 border border-border p-3 text-xs text-muted-foreground">

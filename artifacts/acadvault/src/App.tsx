@@ -16,6 +16,7 @@ import Feed from "@/pages/feed";
 import Chat from "@/pages/chat";
 import MaterialRequests from "@/pages/material-requests";
 import Moderator from "@/pages/moderator";
+import Bookmarks from "@/pages/bookmarks";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,6 +41,7 @@ function Router() {
         <Route path="/admin" component={Admin} />
         <Route path="/material-requests" component={MaterialRequests} />
         <Route path="/moderator" component={Moderator} />
+        <Route path="/bookmarks" component={Bookmarks} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>
