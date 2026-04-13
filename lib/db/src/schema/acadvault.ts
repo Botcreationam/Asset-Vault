@@ -25,6 +25,20 @@ export const transactionTypeEnum = pgEnum("transaction_type", [
   "debit",
 ]);
 
+// ── Schools ───────────────────────────────────────────────────────────────────
+export const schoolsTable = pgTable("schools", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  shortName: text("short_name"),
+  country: text("country").notNull().default("Zambia"),
+  emailDomain: text("email_domain"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type School = typeof schoolsTable.$inferSelect;
+export type InsertSchool = typeof schoolsTable.$inferInsert;
+
 export const foldersTable = pgTable("folders", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -32,6 +46,7 @@ export const foldersTable = pgTable("folders", {
   parentId: text("parent_id"),
   level: integer("level").notNull().default(0),
   icon: text("icon"),
+  schoolId: text("school_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   createdBy: text("created_by"),
 });
@@ -52,6 +67,7 @@ export const resourcesTable = pgTable("resources", {
   downloadCount: integer("download_count").notNull().default(0),
   viewCount: integer("view_count").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
+  schoolId: text("school_id"),
 });
 
 export const unitsTransactionsTable = pgTable("units_transactions", {
@@ -108,6 +124,9 @@ export const auditActionEnum = pgEnum("audit_action", [
   "profile_update",
   "user_registered",
   "units_welcome",
+  "approve_user",
+  "reject_user",
+  "create_school",
 ]);
 
 export const auditLogsTable = pgTable("audit_logs", {

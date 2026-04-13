@@ -7,6 +7,7 @@ export interface User {
   username?: string;
   firstName?: string;
   lastName?: string;
+  email?: string | null;
   profileImageUrl?: string;
   role: "student" | "moderator" | "admin";
   unitsBalance: number;
@@ -18,6 +19,11 @@ export interface User {
   isTrialActive: boolean;
   trialDaysRemaining: number;
   trialEndsAt: string;
+  // Multi-school & approval
+  schoolId?: string | null;
+  institutionalEmail?: string | null;
+  approvalStatus?: "pending" | "approved" | "rejected";
+  rejectionReason?: string | null;
 }
 
 interface AuthContextType {

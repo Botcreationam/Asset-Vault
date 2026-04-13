@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, jsonb, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 export const sessionsTable = pgTable(
@@ -26,6 +26,13 @@ export const usersTable = pgTable("users", {
   academicYear: varchar("academic_year"),
   semester: varchar("semester"),
   onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
+  // Multi-school support
+  schoolId: text("school_id"),
+  institutionalEmail: varchar("institutional_email"),
+  studentIdImageUrl: text("student_id_image_url"),
+  // Approval system: pending → approved | rejected
+  approvalStatus: varchar("approval_status", { enum: ["pending", "approved", "rejected"] }).notNull().default("pending"),
+  rejectionReason: text("rejection_reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
