@@ -20,6 +20,7 @@ import MaterialRequests from "@/pages/material-requests";
 import Moderator from "@/pages/moderator";
 import Bookmarks from "@/pages/bookmarks";
 import Onboarding from "@/pages/onboarding";
+import PendingApproval from "@/pages/pending-approval";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,14 +36,22 @@ function OnboardingGuard() {
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
-    if (
-      !isLoading &&
-      isAuthenticated &&
-      user &&
-      user.onboardingCompleted === false &&
-      location !== "/onboarding"
-    ) {
-      setLocation("/onboarding");
+    if (!isLoading && isAuthenticated && user) {
+      // Not yet onboarded → go to onboarding
+      if (!user.onboardingCompleted && location !== "/onboarding") {
+        setLocation("/onboarding");
+        return;
+      }
+      // Onboarded but pending/rejected → go to pending-approval screen
+      const status = (user as any).approvalStatus;
+      if (
+        user.onboardingCompleted &&
+        (status === "pending" || status === "rejected") &&
+        user.role !== "admin" &&
+        location !== "/pending-approval"
+      ) {
+        setLocation("/pending-approval");
+      }
     }
   }, [isLoading, isAuthenticated, user, location]);
 
@@ -53,6 +62,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/onboarding" component={Onboarding} />
+      <Route path="/pending-approval" component={PendingApproval} />
       <Route>
         <AppLayout>
           <OnboardingGuard />

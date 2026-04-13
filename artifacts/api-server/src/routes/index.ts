@@ -12,6 +12,7 @@ import materialRequestsRouter from "./material-requests";
 import analyticsRouter from "./analytics";
 import bookmarksRouter from "./bookmarks";
 import discoveryRouter from "./discovery";
+import schoolsRouter from "./schools";
 import { apiRateLimit } from "../lib/rate-limit";
 
 const router: IRouter = Router();
@@ -30,5 +31,6 @@ router.use(materialRequestsRouter);
 router.use(analyticsRouter);
 router.use(bookmarksRouter);
 router.use(discoveryRouter);
+router.use(schoolsRouter);
 
 export default router;

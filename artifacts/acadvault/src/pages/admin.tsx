@@ -38,6 +38,14 @@ import {
   TrendingUp,
   Loader2,
   RefreshCw,
+  Building2,
+  Mail,
+  Clock,
+  UserCheck,
+  UserX,
+  ImageIcon,
+  Plus,
+  Globe,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -151,29 +159,26 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs defaultValue="analytics" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 max-w-3xl mb-8 h-12">
-            <TabsTrigger value="analytics" className="text-sm h-10">
-              Analytics
+          <TabsList className="flex flex-wrap gap-1 w-full max-w-4xl mb-8 h-auto p-1">
+            <TabsTrigger value="analytics" className="text-xs h-9 px-3">Analytics</TabsTrigger>
+            <TabsTrigger value="approvals" className="text-xs h-9 px-3 gap-1.5">
+              Approvals
+              <PendingBadge />
             </TabsTrigger>
-            <TabsTrigger value="resources" className="text-sm h-10">
-              Upload
-            </TabsTrigger>
-            <TabsTrigger value="files" className="text-sm h-10">
-              Files
-            </TabsTrigger>
-            <TabsTrigger value="folders" className="text-sm h-10">
-              Folders
-            </TabsTrigger>
-            <TabsTrigger value="users" className="text-sm h-10">
-              Users
-            </TabsTrigger>
-            <TabsTrigger value="audit" className="text-sm h-10">
-              Audit Log
-            </TabsTrigger>
+            <TabsTrigger value="resources" className="text-xs h-9 px-3">Upload</TabsTrigger>
+            <TabsTrigger value="files" className="text-xs h-9 px-3">Files</TabsTrigger>
+            <TabsTrigger value="folders" className="text-xs h-9 px-3">Folders</TabsTrigger>
+            <TabsTrigger value="schools" className="text-xs h-9 px-3">Schools</TabsTrigger>
+            <TabsTrigger value="users" className="text-xs h-9 px-3">Users</TabsTrigger>
+            <TabsTrigger value="audit" className="text-xs h-9 px-3">Audit Log</TabsTrigger>
           </TabsList>
 
           <TabsContent value="analytics">
             <AnalyticsTab />
+          </TabsContent>
+
+          <TabsContent value="approvals">
+            <ApprovalsTab />
           </TabsContent>
 
           <TabsContent value="resources" className="space-y-6">
@@ -186,6 +191,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="folders">
             <FoldersTab folders={foldersData?.folders || []} refetch={refetchFolders} />
+          </TabsContent>
+
+          <TabsContent value="schools">
+            <SchoolsTab />
           </TabsContent>
 
           <TabsContent value="users">
@@ -1367,6 +1376,449 @@ function AuditLogTab() {
                 </div>
               );
             })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Pending badge (live count) ─────────────────────────────────────────────────
+function PendingBadge() {
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    fetch(`${BASE_URL}api/admin/users/pending`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setCount(data.length); })
+      .catch(() => {});
+  }, []);
+  if (!count) return null;
+  return (
+    <span className="bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">
+      {count}
+    </span>
+  );
+}
+
+// ── Approvals Tab ─────────────────────────────────────────────────────────────
+type PendingUser = {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  nickname: string | null;
+  program: string | null;
+  academicYear: string | null;
+  semester: string | null;
+  schoolId: string | null;
+  institutionalEmail: string | null;
+  studentIdImageUrl: string | null;
+  approvalStatus: string;
+  rejectionReason: string | null;
+  createdAt: string;
+};
+
+function ApprovalsTab() {
+  const [users, setUsers] = useState<PendingUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState<string | null>(null);
+  const [rejectDialog, setRejectDialog] = useState<PendingUser | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [viewId, setViewId] = useState<PendingUser | null>(null);
+  const { toast } = useToast();
+
+  async function load() {
+    setLoading(true);
+    try {
+      const r = await fetch(`${BASE_URL}api/admin/users/pending`, { credentials: "include" });
+      const data = await r.json();
+      setUsers(Array.isArray(data) ? data : []);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function approve(userId: string) {
+    setActing(userId);
+    try {
+      const r = await fetch(`${BASE_URL}api/admin/users/${userId}/approve`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error("Failed");
+      toast({ title: "User approved", description: "Confirmation email sent." });
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+    } catch {
+      toast({ title: "Failed to approve user", variant: "destructive" });
+    } finally {
+      setActing(null);
+    }
+  }
+
+  async function reject(userId: string, reason: string) {
+    setActing(userId);
+    try {
+      const r = await fetch(`${BASE_URL}api/admin/users/${userId}/reject`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      toast({ title: "User rejected", description: "Rejection email sent." });
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      setRejectDialog(null);
+      setRejectReason("");
+    } catch {
+      toast({ title: "Failed to reject user", variant: "destructive" });
+    } finally {
+      setActing(null);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card className="border-border/60 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-accent" /> Pending Approvals
+            </CardTitle>
+            <CardDescription>
+              Review and approve or reject newly registered users. Approved users receive a confirmation email.
+            </CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={load} className="gap-1.5">
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : users.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <CheckCircle2 className="w-10 h-10 mx-auto mb-3 text-green-500/50" />
+              <p className="font-semibold">No pending approvals</p>
+              <p className="text-sm mt-1">All registrations have been reviewed.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {users.map((u) => (
+                <div
+                  key={u.id}
+                  className="border border-border/60 rounded-xl p-5 bg-muted/20 hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-foreground">
+                          {u.firstName || u.nickname
+                            ? `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.nickname
+                            : "Unknown User"}
+                        </span>
+                        {u.nickname && (
+                          <Badge variant="outline" className="text-xs">{u.nickname}</Badge>
+                        )}
+                        <Badge className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/20">
+                          Pending
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        {u.email && (
+                          <span className="flex items-center gap-1">
+                            <Mail className="w-3 h-3" /> {u.email}
+                          </span>
+                        )}
+                        {u.institutionalEmail && (
+                          <span className="flex items-center gap-1 text-accent">
+                            <Mail className="w-3 h-3" /> {u.institutionalEmail} (institutional)
+                          </span>
+                        )}
+                        {u.schoolId && (
+                          <span className="flex items-center gap-1">
+                            <Building2 className="w-3 h-3" /> {u.schoolId}
+                          </span>
+                        )}
+                        {u.program && (
+                          <span>{u.program} · Year {u.academicYear} · Sem {u.semester}</span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Registered {format(new Date(u.createdAt), "MMM d, yyyy")}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {u.studentIdImageUrl && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs"
+                          onClick={() => setViewId(u)}
+                        >
+                          <ImageIcon className="w-3.5 h-3.5" /> View ID
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 text-xs border-red-200 text-red-600 hover:bg-red-50"
+                        disabled={acting === u.id}
+                        onClick={() => { setRejectDialog(u); setRejectReason(""); }}
+                      >
+                        <UserX className="w-3.5 h-3.5" /> Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="gap-1.5 text-xs bg-green-600 hover:bg-green-500 text-white"
+                        disabled={acting === u.id}
+                        onClick={() => approve(u.id)}
+                      >
+                        {acting === u.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <UserCheck className="w-3.5 h-3.5" />
+                        )}
+                        Approve
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* View Student ID Dialog */}
+      <Dialog open={!!viewId} onOpenChange={() => setViewId(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Student ID — {viewId?.firstName || viewId?.nickname || "User"}</DialogTitle>
+          </DialogHeader>
+          {viewId?.studentIdImageUrl && (
+            <img
+              src={viewId.studentIdImageUrl}
+              alt="Student ID"
+              className="w-full rounded-lg border border-border"
+            />
+          )}
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              className="border-red-200 text-red-600"
+              onClick={() => { setRejectDialog(viewId); setViewId(null); setRejectReason(""); }}
+            >
+              Reject
+            </Button>
+            <Button
+              className="bg-green-600 hover:bg-green-500 text-white gap-2"
+              onClick={() => { approve(viewId!.id); setViewId(null); }}
+            >
+              <UserCheck className="w-4 h-4" /> Approve
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Dialog */}
+      <Dialog open={!!rejectDialog} onOpenChange={() => setRejectDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Registration</DialogTitle>
+            <DialogDescription>
+              Provide a reason so the user understands what went wrong and what they can do.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label className="text-sm font-semibold">Reason (optional)</Label>
+            <Textarea
+              placeholder="e.g. The student ID provided is not clearly visible…"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={4}
+            />
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => setRejectDialog(null)}>Cancel</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-500 text-white gap-2"
+              disabled={acting === rejectDialog?.id}
+              onClick={() => reject(rejectDialog!.id, rejectReason)}
+            >
+              {acting === rejectDialog?.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserX className="w-4 h-4" />}
+              Reject Registration
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ── Schools Tab ───────────────────────────────────────────────────────────────
+type School = { id: string; name: string; shortName?: string; country: string; emailDomain?: string; isActive: boolean; createdAt: string };
+
+function SchoolsTab() {
+  const [schools, setSchools] = useState<School[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ name: "", shortName: "", country: "Zambia", emailDomain: "" });
+  const { toast } = useToast();
+
+  async function load() {
+    setLoading(true);
+    try {
+      const r = await fetch(`${BASE_URL}api/schools`, { credentials: "include" });
+      const data = await r.json();
+      setSchools(Array.isArray(data) ? data : []);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function addSchool() {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    try {
+      const r = await fetch(`${BASE_URL}api/admin/schools`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!r.ok) throw new Error("Failed");
+      toast({ title: "School added" });
+      setForm({ name: "", shortName: "", country: "Zambia", emailDomain: "" });
+      setShowAdd(false);
+      load();
+    } catch {
+      toast({ title: "Failed to add school", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="border-border/60 shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-accent" /> Institutions
+          </CardTitle>
+          <CardDescription>
+            Manage the schools, colleges, and universities on the platform. Users select their institution during onboarding.
+          </CardDescription>
+        </div>
+        <Button size="sm" className="gap-1.5" onClick={() => setShowAdd(!showAdd)}>
+          <Plus className="w-4 h-4" /> Add School
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {showAdd && (
+          <div className="border border-accent/20 bg-accent/5 rounded-xl p-5 space-y-4">
+            <h3 className="font-semibold text-sm">New Institution</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs font-semibold">Full name *</Label>
+                <Input
+                  placeholder="University of Zambia"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Short name / Abbreviation</Label>
+                <Input
+                  placeholder="UNZA"
+                  value={form.shortName}
+                  onChange={(e) => setForm({ ...form, shortName: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Country</Label>
+                <Input
+                  placeholder="Zambia"
+                  value={form.country}
+                  onChange={(e) => setForm({ ...form, country: e.target.value })}
+                />
+              </div>
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs font-semibold flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5" /> Email domain (optional)
+                </Label>
+                <Input
+                  placeholder="unza.zm"
+                  value={form.emailDomain}
+                  onChange={(e) => setForm({ ...form, emailDomain: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  e.g. <code>unza.zm</code> — used for auto-matching institutional emails.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowAdd(false)}>Cancel</Button>
+              <Button size="sm" onClick={addSchool} disabled={saving || !form.name.trim()} className="gap-1.5">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                Add Institution
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : schools.length === 0 ? (
+          <div className="text-center py-10 text-muted-foreground">
+            <Building2 className="w-8 h-8 mx-auto mb-3 opacity-30" />
+            <p className="text-sm">No institutions added yet.</p>
+            <p className="text-xs mt-1">Add your first institution to allow users to enrol.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs uppercase bg-muted/50 text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 rounded-tl-lg">Institution</th>
+                  <th className="px-4 py-3">Country</th>
+                  <th className="px-4 py-3">Email Domain</th>
+                  <th className="px-4 py-3 rounded-tr-lg">Added</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {schools.map((s) => (
+                  <tr key={s.id} className="hover:bg-muted/20">
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-[#142042] flex items-center justify-center shrink-0">
+                          <Building2 className="w-4 h-4 text-white/70" />
+                        </div>
+                        <div>
+                          <div className="font-semibold">{s.name}</div>
+                          {s.shortName && <div className="text-xs text-muted-foreground">{s.shortName}</div>}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-muted-foreground">{s.country}</td>
+                    <td className="px-4 py-4 text-muted-foreground font-mono text-xs">
+                      {s.emailDomain || "—"}
+                    </td>
+                    <td className="px-4 py-4 text-muted-foreground">
+                      {format(new Date(s.createdAt), "MMM d, yyyy")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </CardContent>

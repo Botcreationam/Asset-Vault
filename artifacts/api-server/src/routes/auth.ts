@@ -13,6 +13,8 @@ import {
   type SessionData,
 } from "../lib/auth";
 import { logAudit } from "../lib/audit";
+import { sendApprovalEmail, sendRejectionEmail } from "../lib/email";
+import { schoolsTable } from "@workspace/db/schema";
 import { z } from "zod";
 import { authRateLimit, uploadRateLimit } from "../lib/rate-limit";
 
@@ -224,6 +226,9 @@ const OnboardingBody = z.object({
   program: z.string().min(2).max(100),
   academicYear: z.string().min(1).max(20),
   semester: z.string().min(1).max(10),
+  schoolId: z.string().optional(),
+  institutionalEmail: z.string().email().optional().or(z.literal("")),
+  studentIdImageUrl: z.string().url().optional().or(z.literal("")),
 });
 
 router.post("/auth/onboarding", async (req: Request, res: Response) => {
@@ -238,6 +243,9 @@ router.post("/auth/onboarding", async (req: Request, res: Response) => {
     return;
   }
 
+  // Admins are auto-approved; everyone else starts as pending for review
+  const isAdmin = req.user.role === "admin";
+
   const [updated] = await db
     .update(usersTable)
     .set({
@@ -245,6 +253,10 @@ router.post("/auth/onboarding", async (req: Request, res: Response) => {
       program: body.data.program.trim(),
       academicYear: body.data.academicYear,
       semester: body.data.semester,
+      schoolId: body.data.schoolId || null,
+      institutionalEmail: body.data.institutionalEmail || null,
+      studentIdImageUrl: body.data.studentIdImageUrl || null,
+      approvalStatus: isAdmin ? "approved" : "pending",
       onboardingCompleted: true,
       updatedAt: new Date(),
     })
@@ -257,10 +269,12 @@ router.post("/auth/onboarding", async (req: Request, res: Response) => {
   req.user.semester = updated.semester;
   req.user.onboardingCompleted = true;
 
-  await logAudit("onboarding_completed", req.user.id, req.user.id, {
+  await logAudit("user_registered", req.user.id, req.user.id, {
     program: updated.program,
     academicYear: updated.academicYear,
     semester: updated.semester,
+    schoolId: updated.schoolId,
+    approvalStatus: updated.approvalStatus,
   });
 
   res.json({ success: true, user: updated });
@@ -444,6 +458,148 @@ router.post("/auth/profile-photo", uploadRateLimit, async (req: Request, res: Re
       res.status(500).json({ error: "Failed to upload photo" });
     }
   });
+});
+
+// Student ID image upload for verification
+router.post("/auth/student-id-upload", uploadRateLimit, async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+
+  const multer = (await import("multer")).default;
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }).single("image");
+
+  upload(req, res, async (err: any) => {
+    if (err) {
+      res.status(400).json({ error: "Upload failed: " + err.message });
+      return;
+    }
+    try {
+      const file = (req as any).file;
+      if (!file) { res.status(400).json({ error: "No file uploaded" }); return; }
+      const allowedMimes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+      if (!allowedMimes.includes(file.mimetype)) {
+        res.status(400).json({ error: "Only image files are allowed" });
+        return;
+      }
+      const base64 = file.buffer.toString("base64");
+      const dataUrl = `data:${file.mimetype};base64,${base64}`;
+      res.json({ url: dataUrl });
+    } catch (e) {
+      console.error("Student ID upload error:", e);
+      res.status(500).json({ error: "Failed to upload image" });
+    }
+  });
+});
+
+// ── Admin: list pending users ────────────────────────────────────────────────
+router.get("/admin/users/pending", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated() || req.user.role !== "admin") {
+    res.status(403).json({ error: "Admin only" });
+    return;
+  }
+  const rows = await db
+    .select({
+      id: usersTable.id,
+      email: usersTable.email,
+      firstName: usersTable.firstName,
+      lastName: usersTable.lastName,
+      nickname: usersTable.nickname,
+      program: usersTable.program,
+      academicYear: usersTable.academicYear,
+      semester: usersTable.semester,
+      schoolId: usersTable.schoolId,
+      institutionalEmail: usersTable.institutionalEmail,
+      studentIdImageUrl: usersTable.studentIdImageUrl,
+      approvalStatus: usersTable.approvalStatus,
+      rejectionReason: usersTable.rejectionReason,
+      createdAt: usersTable.createdAt,
+    })
+    .from(usersTable)
+    .where(eq(usersTable.approvalStatus, "pending"))
+    .orderBy(usersTable.createdAt);
+  res.json(rows);
+});
+
+// ── Admin: approve user ───────────────────────────────────────────────────────
+router.post("/admin/users/:id/approve", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated() || req.user.role !== "admin") {
+    res.status(403).json({ error: "Admin only" });
+    return;
+  }
+  const { id } = req.params;
+  const [user] = await db
+    .update(usersTable)
+    .set({ approvalStatus: "approved", rejectionReason: null, updatedAt: new Date() })
+    .where(eq(usersTable.id, id))
+    .returning();
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  await logAudit("approve_user", req.user.id, user.id, { email: user.email });
+
+  // Get school name for email
+  let schoolName = "your institution";
+  if (user.schoolId) {
+    const [school] = await db.select({ name: schoolsTable.name }).from(schoolsTable).where(eq(schoolsTable.id, user.schoolId));
+    if (school) schoolName = school.name;
+  }
+
+  const name = user.nickname || user.firstName || "Student";
+  const origin = `${req.headers["x-forwarded-proto"] || "https"}://${req.headers["host"]}`;
+
+  if (user.email) {
+    sendApprovalEmail({ to: user.email, name, school: schoolName, loginUrl: origin }).catch(console.error);
+  }
+  if (user.institutionalEmail && user.institutionalEmail !== user.email) {
+    sendApprovalEmail({ to: user.institutionalEmail, name, school: schoolName, loginUrl: origin }).catch(console.error);
+  }
+
+  res.json({ success: true, user });
+});
+
+// ── Admin: reject user ────────────────────────────────────────────────────────
+router.post("/admin/users/:id/reject", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated() || req.user.role !== "admin") {
+    res.status(403).json({ error: "Admin only" });
+    return;
+  }
+  const { id } = req.params;
+  const reason = typeof req.body.reason === "string" ? req.body.reason.trim() : "";
+
+  const [user] = await db
+    .update(usersTable)
+    .set({ approvalStatus: "rejected", rejectionReason: reason || null, updatedAt: new Date() })
+    .where(eq(usersTable.id, id))
+    .returning();
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  await logAudit("reject_user", req.user.id, user.id, { email: user.email, reason });
+
+  let schoolName = "your institution";
+  if (user.schoolId) {
+    const [school] = await db.select({ name: schoolsTable.name }).from(schoolsTable).where(eq(schoolsTable.id, user.schoolId));
+    if (school) schoolName = school.name;
+  }
+
+  const name = user.nickname || user.firstName || "Student";
+  const origin = `${req.headers["x-forwarded-proto"] || "https"}://${req.headers["host"]}`;
+  const contactUrl = `https://wa.me/260978277538`;
+
+  if (user.email) {
+    sendRejectionEmail({ to: user.email, name, school: schoolName, reason, contactUrl }).catch(console.error);
+  }
+  if (user.institutionalEmail && user.institutionalEmail !== user.email) {
+    sendRejectionEmail({ to: user.institutionalEmail, name, school: schoolName, reason, contactUrl }).catch(console.error);
+  }
+
+  res.json({ success: true, user });
 });
 
 router.get("/logout", async (req: Request, res: Response) => {
