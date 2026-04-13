@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
 import { motion } from "framer-motion";
-import { ArrowRight, BookOpen, Library, MessageCircle, Search, Shield, Zap } from "lucide-react";
+import { ArrowRight, BookOpen, Library, Search, Shield, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -41,15 +41,6 @@ export default function Home() {
 
   return (
     <div className="flex flex-col gap-12 pb-12">
-      <a
-        href="https://wa.me/260978277538"
-        target="_blank"
-        rel="noreferrer"
-        aria-label="Chat on WhatsApp"
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-green-500 text-white shadow-lg shadow-green-500/30 transition-transform hover:scale-110"
-      >
-        <MessageCircle className="h-7 w-7" />
-      </a>
       {/* Hero Section */}
       <section className="relative rounded-3xl overflow-hidden shadow-2xl bg-primary text-primary-foreground min-h-[450px] flex items-center">
         {/* Background Image with Overlay */}
