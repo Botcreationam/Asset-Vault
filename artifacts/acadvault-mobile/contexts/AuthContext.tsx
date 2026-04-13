@@ -69,16 +69,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async () => {
     try {
-      // Create a deep link URL that Expo can handle — the backend will redirect here after auth,
-      // which tells openAuthSessionAsync to close the browser and return to the app automatically.
+      // The deep link URL that Expo listens for. When the server redirects to this, the
+      // browser (ASWebAuthenticationSession on iOS) closes automatically.
       const redirectUrl = Linking.createURL("/");
       const loginUrl = `${BASE}/api/login?mobileReturnTo=${encodeURIComponent(redirectUrl)}`;
 
-      await WebBrowser.openAuthSessionAsync(loginUrl, redirectUrl);
+      const result = await WebBrowser.openAuthSessionAsync(loginUrl, redirectUrl);
+
+      // On success the server embeds a one-time exchange token in the deep link URL.
+      // We trade it for a real session cookie via a normal fetch so that iOS's regular
+      // HTTP stack (NSURLSession) picks it up — ASWebAuthenticationSession has its own
+      // isolated cookie jar that fetch/axios cannot access.
+      if (result.type === "success" && result.url) {
+        const parsed = Linking.parse(result.url);
+        const token = parsed.queryParams?.token;
+        if (token) {
+          await fetch(`${BASE}/api/auth/exchange?token=${token}`, {
+            credentials: "include",
+          });
+        }
+      }
     } catch {
-      // Ignore errors (e.g. user cancelled)
+      // Ignore — user may have cancelled or dismissed the browser
     } finally {
-      // Always re-check session — auth may have completed even if the browser closed unexpectedly
+      // Always re-check session state regardless of outcome
       await fetchUser();
     }
   }, [fetchUser]);
