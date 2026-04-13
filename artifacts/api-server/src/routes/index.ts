@@ -6,6 +6,10 @@ import resourcesRouter from "./resources";
 import unitsRouter from "./units";
 import socialRouter from "./social";
 import chatRouter from "./chat";
+import ratingsRouter from "./ratings";
+import notificationsRouter from "./notifications";
+import materialRequestsRouter from "./material-requests";
+import analyticsRouter from "./analytics";
 import { apiRateLimit } from "../lib/rate-limit";
 
 const router: IRouter = Router();
@@ -18,5 +22,9 @@ router.use(resourcesRouter);
 router.use(unitsRouter);
 router.use(socialRouter);
 router.use(chatRouter);
+router.use(ratingsRouter);
+router.use(notificationsRouter);
+router.use(materialRequestsRouter);
+router.use(analyticsRouter);
 
 export default router;

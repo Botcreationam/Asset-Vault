@@ -57,6 +57,9 @@ artifacts-monorepo/
 - **conversations** — Chat conversations (id, name, isGroup, createdAt)
 - **conversation_participants** — Users in a conversation (id, conversationId, userId, joinedAt)
 - **messages** — Chat messages (id, conversationId, senderId, content, createdAt)
+- **resource_ratings** — Star ratings + reviews (id, resourceId, userId, rating 1-5, review, createdAt; unique per user+resource)
+- **notifications** — In-app notifications (id, userId, type, title, body, isRead, relatedId, createdAt)
+- **material_requests** — Student material requests (id, userId, title, description, subject, courseCode, status: pending|in_progress|fulfilled|rejected, adminNote, createdAt)
 
 ## Key Features
 
@@ -64,11 +67,16 @@ artifacts-monorepo/
 2. **Free Viewing**: PDFs/slides viewable in-browser via signed URL (free for authenticated users)
 3. **Paid Downloads**: 5 units per download (configurable per resource)
 4. **Units System**: Admin can grant units; transaction history tracked
-5. **Admin Panel**: Upload resources, manage folders, manage users, grant units
-6. **Protected Storage**: Files stored in GCS via App Storage; signed URLs expire (60min view, 15min download)
-7. **Social Feed**: Facebook-style newsfeed with posts, comments, and likes (real-time via WebSocket)
-8. **Real-Time Chat**: Direct messaging between users with WebSocket-powered live updates
-9. **Profile Photos**: Upload profile photos (max 2MB; JPEG/PNG/GIF/WebP only) from the account page
+5. **Admin Panel**: Upload resources, manage folders, manage users, grant units, view analytics
+6. **Admin Analytics Dashboard**: Real-time stats — total users, downloads, views, top resources, units circulating, avg ratings, pending requests
+7. **Protected Storage**: Files stored in GCS via App Storage; signed URLs expire (60min view, 15min download)
+8. **Social Feed**: Facebook-style newsfeed with posts, comments, and likes (real-time via WebSocket)
+9. **Real-Time Chat**: Direct messaging between users with WebSocket-powered live updates
+10. **Profile Photos**: Upload profile photos (max 2MB; JPEG/PNG/GIF/WebP only) from the account page
+11. **Ratings & Reviews**: 5-star ratings with written reviews on each resource detail page; bar chart distribution shown
+12. **In-App Notifications**: Bell icon in header with unread badge; auto-polls every 30s; mark-all-read; triggered on unit grants and material request fulfillment
+13. **Material Requests**: Students request missing resources; admins manage status (pending → in_progress → fulfilled/rejected) with admin notes; fulfilled requests send notifications
+14. **PWA Support**: `manifest.json` with theme colors + apple-touch-icon meta tags for installable web app
 
 ## Security
 
@@ -130,6 +138,16 @@ All routes at `/api`:
 - `GET /admin/users` — list all users (admin)
 - `PATCH /admin/users/:id/role` — change user role (admin)
 - `POST /admin/users/:id/units` — grant units to user (admin)
+- `GET /admin/analytics` — platform analytics: users, downloads, top resources, ratings, requests (admin)
+- `GET /resources/:id/ratings` — get ratings + average for a resource
+- `POST /resources/:id/ratings` — submit or update a rating (auth required)
+- `DELETE /resources/:id/ratings` — remove own rating (auth required)
+- `GET /notifications` — user's notifications + unread count (auth required)
+- `PATCH /notifications/read-all` — mark all notifications read (auth required)
+- `PATCH /notifications/:id/read` — mark single notification read (auth required)
+- `GET /material-requests` — list requests (own for students; all for admin)
+- `POST /material-requests` — submit a material request (auth required)
+- `PATCH /material-requests/:id` — update request status (admin)
 
 ## Packages
 

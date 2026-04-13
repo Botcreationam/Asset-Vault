@@ -14,11 +14,11 @@ import Admin from "@/pages/admin";
 import Search from "@/pages/search";
 import Feed from "@/pages/feed";
 import Chat from "@/pages/chat";
+import MaterialRequests from "@/pages/material-requests";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Auth role changes propagate immediately when user refocuses the window
       refetchOnWindowFocus: true,
       staleTime: 0,
     },
@@ -37,6 +37,7 @@ function Router() {
         <Route path="/chat" component={Chat} />
         <Route path="/account" component={Account} />
         <Route path="/admin" component={Admin} />
+        <Route path="/material-requests" component={MaterialRequests} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

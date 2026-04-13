@@ -11,6 +11,7 @@ import {
   SecureViewerSkeleton,
   SecureViewerError,
 } from "@/components/secure-viewer";
+import { ResourceRatings } from "@/components/resource-ratings";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
@@ -297,6 +298,9 @@ export default function ResourceDetail() {
             userId={user?.id}
           />
         </div>
+
+        {/* ── Ratings & Reviews ── */}
+        <ResourceRatings resourceId={resourceId} />
       </div>
 
       {/* ── Download Confirmation Modal ── */}
