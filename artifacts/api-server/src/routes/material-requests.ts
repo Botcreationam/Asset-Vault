@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { isContentManager } from "../lib/roles";
 import { db } from "@workspace/db";
 import { materialRequestsTable } from "@workspace/db/schema";
 import { usersTable } from "@workspace/db";
@@ -13,7 +14,7 @@ router.get("/material-requests", async (req, res) => {
     return;
   }
   try {
-    if (req.user!.role === "admin") {
+    if (isContentManager(req)) {
       const requests = await db
         .select({
           id: materialRequestsTable.id,
@@ -75,7 +76,7 @@ router.post("/material-requests", async (req, res) => {
 });
 
 router.patch("/material-requests/:id", async (req, res) => {
-  if (!req.isAuthenticated() || req.user!.role !== "admin") {
+  if (!req.isAuthenticated() || !isContentManager(req)) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }

@@ -43,7 +43,7 @@ artifacts-monorepo/
 
 ## Database Schema
 
-- **users** — Replit Auth users (id, username, email, firstName, lastName, profileImageUrl, role: student|admin)
+- **users** — Replit Auth users (id, username, email, firstName, lastName, profileImageUrl, role: student|moderator|admin)
 - **sessions** — Auth sessions (Replit Auth managed)
 - **folders** — Hierarchical folder structure (id, name, description, parentId, level, icon)
 - **resources** — Academic files (id, name, type, folderId, storagePath, fileSize, mimeType, downloadCost, tags, viewCount, downloadCount)
@@ -77,6 +77,7 @@ artifacts-monorepo/
 12. **In-App Notifications**: Bell icon in header with unread badge; auto-polls every 30s; mark-all-read; triggered on unit grants and material request fulfillment
 13. **Material Requests**: Students request missing resources; admins manage status (pending → in_progress → fulfilled/rejected) with admin notes; fulfilled requests send notifications
 14. **PWA Support**: `manifest.json` with theme colors + apple-touch-icon meta tags for installable web app
+15. **Moderator Role**: Three-tier role system (student → moderator → admin). Moderators can manage folders, upload/delete resources, moderate posts/comments (including a comment delete endpoint), and respond to material requests. They are blocked from: granting units, changing user roles, viewing analytics, and system settings. Moderators get a dedicated `/moderator` portal with Requests, Posts, and Folders tabs. Admins assign the moderator role via the Admin Portal user management.
 
 ## Security
 

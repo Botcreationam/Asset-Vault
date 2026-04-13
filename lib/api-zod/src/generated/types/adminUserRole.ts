@@ -10,5 +10,6 @@ export type AdminUserRole = (typeof AdminUserRole)[keyof typeof AdminUserRole];
 
 export const AdminUserRole = {
   student: "student",
+  moderator: "moderator",
   admin: "admin",
 } as const;

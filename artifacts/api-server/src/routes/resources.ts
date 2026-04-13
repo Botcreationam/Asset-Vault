@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { isContentManager } from "../lib/roles";
 import { db } from "@workspace/db";
 import {
   resourcesTable,
@@ -139,7 +140,7 @@ router.get("/resources", async (req, res) => {
 
 router.post("/resources", upload.single("file"), async (req, res) => {
   try {
-    if (!req.isAuthenticated() || req.user.role !== "admin") {
+    if (!req.isAuthenticated() || !isContentManager(req)) {
       res.status(403).json({ error: "Admin access required" });
       return;
     }
@@ -228,7 +229,7 @@ router.get("/resources/:resourceId", async (req, res) => {
 
 router.delete("/resources/:resourceId", async (req, res) => {
   try {
-    if (!req.isAuthenticated() || req.user.role !== "admin") {
+    if (!req.isAuthenticated() || !isContentManager(req)) {
       res.status(403).json({ error: "Admin access required" });
       return;
     }
@@ -258,7 +259,7 @@ router.delete("/resources/:resourceId", async (req, res) => {
 
 router.patch("/resources/:resourceId", async (req, res) => {
   try {
-    if (!req.isAuthenticated() || req.user.role !== "admin") {
+    if (!req.isAuthenticated() || !isContentManager(req)) {
       res.status(403).json({ error: "Admin access required" });
       return;
     }
@@ -516,7 +517,7 @@ router.post("/resources/:resourceId/download", downloadRateLimit, async (req, re
 // ── Admin: list all resources (including inactive) ───────────────────────────
 router.get("/admin/resources", async (req, res) => {
   try {
-    if (!req.isAuthenticated() || req.user.role !== "admin") {
+    if (!req.isAuthenticated() || !isContentManager(req)) {
       res.status(403).json({ error: "Admin access required" });
       return;
     }

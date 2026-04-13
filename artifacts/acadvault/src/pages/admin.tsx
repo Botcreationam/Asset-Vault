@@ -134,7 +134,7 @@ export default function AdminDashboard() {
     },
   });
 
-  const handleRoleChange = (userId: string, newRole: "student" | "admin") => {
+  const handleRoleChange = (userId: string, newRole: "student" | "moderator" | "admin") => {
     updateRoleMutation.mutate({ userId, data: { role: newRole } });
   };
 
@@ -247,6 +247,7 @@ export default function AdminDashboard() {
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="student">Student</SelectItem>
+                                  <SelectItem value="moderator">Moderator</SelectItem>
                                   <SelectItem value="admin">Admin</SelectItem>
                                 </SelectContent>
                               </Select>

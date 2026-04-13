@@ -11,5 +11,6 @@ export type UpdateUserRoleBodyRole =
 
 export const UpdateUserRoleBodyRole = {
   student: "student",
+  moderator: "moderator",
   admin: "admin",
 } as const;
