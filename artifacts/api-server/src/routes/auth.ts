@@ -55,6 +55,15 @@ function getSafeReturnTo(value: unknown): string {
   return value;
 }
 
+/** Validate a mobile deep-link URL (Expo Go `exp://` or custom scheme `acadvault-mobile://`). */
+function getSafeMobileReturnTo(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  if (value.startsWith("exp://") || value.startsWith("acadvault-mobile://")) {
+    return value;
+  }
+  return null;
+}
+
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
   .split(",")
   .map((e) => e.trim().toLowerCase())
@@ -253,6 +262,7 @@ router.get("/login", authRateLimit, async (req: Request, res: Response) => {
   const callbackUrl = `${getOrigin(req)}/api/callback`;
 
   const returnTo = getSafeReturnTo(req.query.returnTo);
+  const mobileReturnTo = getSafeMobileReturnTo(req.query.mobileReturnTo);
 
   const state = oidc.randomState();
   const nonce = oidc.randomNonce();
@@ -273,6 +283,9 @@ router.get("/login", authRateLimit, async (req: Request, res: Response) => {
   setOidcCookie(res, "nonce", nonce);
   setOidcCookie(res, "state", state);
   setOidcCookie(res, "return_to", returnTo);
+  if (mobileReturnTo) {
+    setOidcCookie(res, "mobile_return_to", mobileReturnTo);
+  }
 
   res.redirect(redirectTo.href);
 });
@@ -308,11 +321,13 @@ router.get("/callback", async (req: Request, res: Response) => {
   }
 
   const returnTo = getSafeReturnTo(req.cookies?.return_to);
+  const mobileReturnTo = getSafeMobileReturnTo(req.cookies?.mobile_return_to);
 
   res.clearCookie("code_verifier", { path: "/" });
   res.clearCookie("nonce", { path: "/" });
   res.clearCookie("state", { path: "/" });
   res.clearCookie("return_to", { path: "/" });
+  res.clearCookie("mobile_return_to", { path: "/" });
 
   const claims = tokens.claims();
   if (!claims) {
@@ -340,6 +355,13 @@ router.get("/callback", async (req: Request, res: Response) => {
 
   const sid = await createSession(sessionData);
   setSessionCookie(res, sid);
+
+  // If this was a mobile login, redirect to the deep link so Expo closes the browser
+  if (mobileReturnTo) {
+    res.redirect(mobileReturnTo);
+    return;
+  }
+
   res.redirect(returnTo);
 });
 
