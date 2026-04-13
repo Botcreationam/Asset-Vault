@@ -8,9 +8,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface AuthWrapperProps {
   children: ReactNode;
   requireAdmin?: boolean;
+  requireModerator?: boolean;
 }
 
-export function AuthWrapper({ children, requireAdmin = false }: AuthWrapperProps) {
+export function AuthWrapper({ children, requireAdmin = false, requireModerator = false }: AuthWrapperProps) {
   const { user, isAuthenticated, isLoading, login } = useAuth();
 
   if (isLoading) {
@@ -59,6 +60,24 @@ export function AuthWrapper({ children, requireAdmin = false }: AuthWrapperProps
             <CardTitle className="font-serif text-2xl text-destructive">Access Denied</CardTitle>
             <CardDescription className="text-base mt-2">
               This area is restricted to administrators.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  if (requireModerator && user?.role !== "admin" && user?.role !== "moderator") {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="w-full max-w-md shadow-xl border-destructive/20">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mb-4">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <CardTitle className="font-serif text-2xl text-destructive">Access Denied</CardTitle>
+            <CardDescription className="text-base mt-2">
+              This area is restricted to content moderators and administrators.
             </CardDescription>
           </CardHeader>
         </Card>

@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { isContentManager } from "../lib/roles";
 import { db, usersTable } from "@workspace/db";
 import {
   postsTable,
@@ -152,7 +153,7 @@ router.delete("/social/posts/:postId", async (req, res) => {
     return;
   }
 
-  if (post.authorId !== req.user!.id && req.user!.role !== "admin") {
+  if (post.authorId !== req.user!.id && !isContentManager(req)) {
     res.status(403).json({ error: "Not authorized" });
     return;
   }
@@ -276,6 +277,40 @@ router.post("/social/posts/:postId/comments", commentRateLimit, async (req, res)
   broadcast({ type: "new_comment", data: fullComment });
 
   res.status(201).json(fullComment);
+});
+
+router.delete("/social/posts/:postId/comments/:commentId", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+
+  const postId = Number(req.params.postId);
+  const commentId = Number(req.params.commentId);
+
+  const [comment] = await db
+    .select({ id: postCommentsTable.id, authorId: postCommentsTable.authorId, postId: postCommentsTable.postId })
+    .from(postCommentsTable)
+    .where(and(eq(postCommentsTable.id, commentId), eq(postCommentsTable.postId, postId)));
+
+  if (!comment) {
+    res.status(404).json({ error: "Comment not found" });
+    return;
+  }
+
+  if (comment.authorId !== req.user!.id && !isContentManager(req)) {
+    res.status(403).json({ error: "Not authorized" });
+    return;
+  }
+
+  await db.delete(postCommentsTable).where(eq(postCommentsTable.id, commentId));
+  await db
+    .update(postsTable)
+    .set({ commentsCount: sql`GREATEST(${postsTable.commentsCount} - 1, 0)` })
+    .where(eq(postsTable.id, postId));
+
+  broadcast({ type: "delete_comment", data: { postId, commentId } });
+  res.json({ success: true });
 });
 
 router.post("/social/posts/:postId/react", reactionRateLimit, async (req, res) => {

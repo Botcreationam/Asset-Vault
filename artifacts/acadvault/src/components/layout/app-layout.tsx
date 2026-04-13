@@ -19,6 +19,7 @@ import {
   Bell,
   PackageSearch,
   CheckCheck,
+  Shield,
 } from "lucide-react";
 
 import { 
@@ -104,6 +105,9 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   if (user?.role === "admin") {
     userItems.push({ title: "Admin Portal", url: "/admin", icon: ShieldCheck });
+  }
+  if (user?.role === "moderator") {
+    userItems.push({ title: "Moderator Portal", url: "/moderator", icon: Shield });
   }
 
   const style = {

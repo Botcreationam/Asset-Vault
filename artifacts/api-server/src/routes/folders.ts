@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { isContentManager } from "../lib/roles";
 import { db } from "@workspace/db";
 import {
   foldersTable,
@@ -140,7 +141,7 @@ router.get("/folders", async (req, res) => {
 // Returns every folder (for admin dropdowns). No parentId filter.
 router.get("/folders/all", async (req, res) => {
   try {
-    if (!req.isAuthenticated() || req.user.role !== "admin") {
+    if (!req.isAuthenticated() || !isContentManager(req)) {
       res.status(403).json({ error: "Admin access required" });
       return;
     }
@@ -159,7 +160,7 @@ router.get("/folders/all", async (req, res) => {
 
 router.post("/folders", async (req, res) => {
   try {
-    if (!req.isAuthenticated() || req.user.role !== "admin") {
+    if (!req.isAuthenticated() || !isContentManager(req)) {
       res.status(403).json({ error: "Admin access required" });
       return;
     }
@@ -257,7 +258,7 @@ const UpdateFolderBody = z.object({
 
 router.patch("/folders/:folderId", async (req, res) => {
   try {
-    if (!req.isAuthenticated() || req.user.role !== "admin") {
+    if (!req.isAuthenticated() || !isContentManager(req)) {
       res.status(403).json({ error: "Admin access required" });
       return;
     }
@@ -329,7 +330,7 @@ router.patch("/folders/:folderId", async (req, res) => {
 
 router.delete("/folders/:folderId", async (req, res) => {
   try {
-    if (!req.isAuthenticated() || req.user.role !== "admin") {
+    if (!req.isAuthenticated() || !isContentManager(req)) {
       res.status(403).json({ error: "Admin access required" });
       return;
     }

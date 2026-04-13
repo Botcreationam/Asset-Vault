@@ -26,7 +26,7 @@ export const GetCurrentAuthUserResponse = zod.object({
       firstName: zod.string().optional(),
       lastName: zod.string().optional(),
       profileImageUrl: zod.string().optional(),
-      role: zod.enum(["student", "admin"]),
+      role: zod.enum(["student", "moderator", "admin"]),
       unitsBalance: zod.number(),
     })
     .optional(),
@@ -274,7 +274,7 @@ export const AdminListUsersResponse = zod.object({
       firstName: zod.string().optional(),
       lastName: zod.string().optional(),
       profileImageUrl: zod.string().optional(),
-      role: zod.enum(["student", "admin"]),
+      role: zod.enum(["student", "moderator", "admin"]),
       unitsBalance: zod.number(),
       createdAt: zod.date(),
       downloadCount: zod.number().optional(),
@@ -290,7 +290,7 @@ export const AdminUpdateUserRoleParams = zod.object({
 });
 
 export const AdminUpdateUserRoleBody = zod.object({
-  role: zod.enum(["student", "admin"]),
+  role: zod.enum(["student", "moderator", "admin"]),
 });
 
 export const AdminUpdateUserRoleResponse = zod.object({
@@ -299,7 +299,7 @@ export const AdminUpdateUserRoleResponse = zod.object({
   firstName: zod.string().optional(),
   lastName: zod.string().optional(),
   profileImageUrl: zod.string().optional(),
-  role: zod.enum(["student", "admin"]),
+  role: zod.enum(["student", "moderator", "admin"]),
   unitsBalance: zod.number(),
   createdAt: zod.date(),
   downloadCount: zod.number().optional(),

@@ -91,7 +91,7 @@ export async function authMiddleware(
 
   req.user = {
     ...refreshed.user,
-    role: (dbUser?.role ?? "student") as "student" | "admin",
+    role: (dbUser?.role ?? "student") as "student" | "moderator" | "admin",
     username: dbUser?.username ?? undefined,
     unitsBalance: 0,
   };
