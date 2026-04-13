@@ -261,3 +261,17 @@ export const insertMaterialRequestSchema = createInsertSchema(materialRequestsTa
 });
 export type InsertMaterialRequest = z.infer<typeof insertMaterialRequestSchema>;
 export type MaterialRequest = typeof materialRequestsTable.$inferSelect;
+
+// ── Resource Bookmarks ─────────────────────────────────────────────────────────
+export const resourceBookmarksTable = pgTable(
+  "resource_bookmarks",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    resourceId: text("resource_id").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("resource_bookmarks_user_resource_idx").on(table.userId, table.resourceId)],
+);
+
+export type ResourceBookmark = typeof resourceBookmarksTable.$inferSelect;

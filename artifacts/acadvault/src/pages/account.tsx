@@ -5,8 +5,9 @@ import {
   useGetUnitsTransactions,
 } from "@workspace/api-client-react";
 import { AuthWrapper } from "@/components/auth-wrapper";
-import { useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { format, formatDistanceToNow } from "date-fns";
+import { Link } from "wouter";
 import {
   Zap,
   History,
@@ -20,7 +21,11 @@ import {
   X,
   Camera,
   Loader2,
+  Download,
+  FileText,
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getResourceIcon } from "@/lib/resource-utils";
 import {
   Card,
   CardContent,
@@ -273,86 +278,147 @@ export default function Account() {
           </Card>
         </div>
 
-        {/* Transaction History */}
-        <Card className="bg-card shadow-md border-border/60">
-          <CardHeader className="border-b border-border/50 pb-4">
-            <CardTitle className="flex items-center gap-2 font-serif text-xl">
-              <History className="w-5 h-5 text-primary" /> Transaction History
-            </CardTitle>
-            <CardDescription>Recent changes to your unit balance</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {isLoadingHistory ? (
-              <div className="p-6 flex flex-col gap-4">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-16 w-full rounded-lg" />
-                ))}
-              </div>
-            ) : historyData?.transactions?.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground flex flex-col items-center">
-                <CreditCard className="w-12 h-12 mb-4 opacity-20" />
-                <p>No transactions found.</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-border/50">
-                {historyData?.transactions?.map((tx) => (
-                  <div
-                    key={tx.id}
-                    className="p-4 sm:p-6 flex items-center justify-between hover:bg-muted/30 transition-colors"
-                  >
-                    <div className="flex items-start sm:items-center gap-4">
+        {/* Tabs: Transactions + Downloads */}
+        <Tabs defaultValue="transactions">
+          <TabsList className="mb-4 h-10">
+            <TabsTrigger value="transactions" className="gap-2">
+              <History className="w-4 h-4" /> Transactions
+            </TabsTrigger>
+            <TabsTrigger value="downloads" className="gap-2">
+              <Download className="w-4 h-4" /> My Downloads
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="transactions">
+            <Card className="bg-card shadow-md border-border/60">
+              <CardHeader className="border-b border-border/50 pb-4">
+                <CardTitle className="flex items-center gap-2 font-serif text-xl">
+                  <History className="w-5 h-5 text-primary" /> Transaction History
+                </CardTitle>
+                <CardDescription>Recent changes to your unit balance</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                {isLoadingHistory ? (
+                  <div className="p-6 flex flex-col gap-4">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                    ))}
+                  </div>
+                ) : historyData?.transactions?.length === 0 ? (
+                  <div className="p-12 text-center text-muted-foreground flex flex-col items-center">
+                    <CreditCard className="w-12 h-12 mb-4 opacity-20" />
+                    <p>No transactions found.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/50">
+                    {historyData?.transactions?.map((tx) => (
                       <div
-                        className={`p-2.5 rounded-full shrink-0 ${
-                          tx.type === "credit"
-                            ? "bg-green-500/10 text-green-600"
-                            : "bg-rose-500/10 text-rose-600"
-                        }`}
+                        key={tx.id}
+                        className="p-4 sm:p-6 flex items-center justify-between hover:bg-muted/30 transition-colors"
                       >
-                        {tx.type === "credit" ? (
-                          <ArrowDownRight className="w-5 h-5" />
-                        ) : (
-                          <ArrowUpRight className="w-5 h-5" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-foreground text-sm sm:text-base">
-                          {tx.description}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                          <span>
-                            {format(
-                              new Date(tx.createdAt),
-                              "MMM d, yyyy • h:mm a"
+                        <div className="flex items-start sm:items-center gap-4">
+                          <div
+                            className={`p-2.5 rounded-full shrink-0 ${
+                              tx.type === "credit"
+                                ? "bg-green-500/10 text-green-600"
+                                : "bg-rose-500/10 text-rose-600"
+                            }`}
+                          >
+                            {tx.type === "credit" ? (
+                              <ArrowDownRight className="w-5 h-5" />
+                            ) : (
+                              <ArrowUpRight className="w-5 h-5" />
                             )}
-                          </span>
-                          {tx.resourceName && (
-                            <>
-                              <span>•</span>
-                              <span className="truncate max-w-[150px] sm:max-w-xs block">
-                                {tx.resourceName}
-                              </span>
-                            </>
-                          )}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-foreground text-sm sm:text-base">
+                              {tx.description}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                              <span>{format(new Date(tx.createdAt), "MMM d, yyyy • h:mm a")}</span>
+                              {tx.resourceName && (
+                                <>
+                                  <span>•</span>
+                                  <span className="truncate max-w-[150px] sm:max-w-xs block">{tx.resourceName}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className={`font-bold text-lg shrink-0 ${tx.type === "credit" ? "text-green-600" : "text-foreground"}`}>
+                          {tx.type === "credit" ? "+" : "-"}{tx.amount}
                         </div>
                       </div>
-                    </div>
-                    <div
-                      className={`font-bold text-lg shrink-0 ${
-                        tx.type === "credit"
-                          ? "text-green-600"
-                          : "text-foreground"
-                      }`}
-                    >
-                      {tx.type === "credit" ? "+" : "-"}
-                      {tx.amount}
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="downloads">
+            <DownloadHistory />
+          </TabsContent>
+        </Tabs>
       </div>
     </AuthWrapper>
+  );
+}
+
+function DownloadHistory() {
+  const { data, isLoading } = useQuery<{ downloads: any[] }>({
+    queryKey: ["/api/users/me/downloads"],
+    queryFn: async () => {
+      const res = await fetch(`${BASE_URL}api/users/me/downloads`, { credentials: "include" });
+      return res.json();
+    },
+  });
+
+  const downloads = data?.downloads ?? [];
+
+  return (
+    <Card className="bg-card shadow-md border-border/60">
+      <CardHeader className="border-b border-border/50 pb-4">
+        <CardTitle className="flex items-center gap-2 font-serif text-xl">
+          <Download className="w-5 h-5 text-primary" /> Download History
+        </CardTitle>
+        <CardDescription>All resources you've downloaded using units</CardDescription>
+      </CardHeader>
+      <CardContent className="p-0">
+        {isLoading ? (
+          <div className="p-6 flex flex-col gap-4">
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
+          </div>
+        ) : downloads.length === 0 ? (
+          <div className="p-12 text-center text-muted-foreground flex flex-col items-center">
+            <FileText className="w-12 h-12 mb-4 opacity-20" />
+            <p>You haven't downloaded any resources yet.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border/50">
+            {downloads.map((dl: any) => (
+              <Link key={dl.txId} href={dl.resource.isActive ? `/resource/${dl.resource.id}` : "#"}>
+                <div className="p-4 sm:p-5 flex items-center gap-4 hover:bg-muted/30 transition-colors cursor-pointer group">
+                  <div className="p-2 bg-background rounded-lg border border-border/50 shrink-0 group-hover:scale-105 transition-transform">
+                    {getResourceIcon(dl.resource.type, "sm")}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors truncate">
+                      {dl.resource.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Downloaded {formatDistanceToNow(new Date(dl.downloadedAt), { addSuffix: true })}
+                    </p>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-1 text-rose-500 font-semibold text-sm">
+                    <Zap className="w-3.5 h-3.5" /> {dl.amount}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

@@ -26,6 +26,7 @@ import {
   Plus,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { BookmarkButton } from "@/components/bookmark-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -347,12 +348,15 @@ export default function Browse() {
                             </div>
                           </div>
 
-                          <div className="shrink-0 flex items-center gap-4">
-                            <div className="hidden sm:flex flex-col items-end mr-4">
+                          <div className="shrink-0 flex items-center gap-2">
+                            <div className="hidden sm:flex flex-col items-end mr-2">
                               <span className="text-xs font-medium text-muted-foreground">Cost</span>
                               <div className="flex items-center gap-1 text-accent font-bold">
                                 <Zap className="w-3.5 h-3.5" /> {resource.downloadCost}
                               </div>
+                            </div>
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              <BookmarkButton resourceId={resource.id} size="sm" />
                             </div>
                             <div className="w-10 h-10 rounded-full bg-secondary/30 flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors text-primary">
                               <ChevronRight className="w-5 h-5" />

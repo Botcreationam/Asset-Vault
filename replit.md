@@ -60,6 +60,7 @@ artifacts-monorepo/
 - **resource_ratings** — Star ratings + reviews (id, resourceId, userId, rating 1-5, review, createdAt; unique per user+resource)
 - **notifications** — In-app notifications (id, userId, type, title, body, isRead, relatedId, createdAt)
 - **material_requests** — Student material requests (id, userId, title, description, subject, courseCode, status: pending|in_progress|fulfilled|rejected, adminNote, createdAt)
+- **resource_bookmarks** — Saved resources per user (id, userId, resourceId, createdAt; unique per user+resource)
 
 ## Key Features
 
@@ -78,6 +79,7 @@ artifacts-monorepo/
 13. **Material Requests**: Students request missing resources; admins manage status (pending → in_progress → fulfilled/rejected) with admin notes; fulfilled requests send notifications
 14. **PWA Support**: `manifest.json` with theme colors + apple-touch-icon meta tags for installable web app
 15. **Moderator Role**: Three-tier role system (student → moderator → admin). Moderators can manage folders, upload/delete resources, moderate posts/comments (including a comment delete endpoint), and respond to material requests. They are blocked from: granting units, changing user roles, viewing analytics, and system settings. Moderators get a dedicated `/moderator` portal with Requests, Posts, and Folders tabs. Admins assign the moderator role via the Admin Portal user management.
+16. **Discovery & Saved Resources**: Home page has live stats bar (total resources, views, downloads) + three horizontal scrollable resource rows (Trending, Top Rated, Recent). Bookmark button on every resource card (browse page) and resource detail page — toggles save with optimistic update. `/bookmarks` page shows all saved resources. Account page has a Downloads tab alongside Transactions showing download history with resource type icons and relative timestamps. Discovery API routes: `/api/discovery/trending`, `/top-rated`, `/recent`, `/stats`. Bookmarks API: `/api/bookmarks` (GET list), `/api/bookmarks/:id` (POST toggle), `/api/bookmarks/check/:id`. Download history: `/api/users/me/downloads`. Shared utilities: `@/lib/resource-utils` with `getResourceIcon(type, size?)` and `formatBytes(bytes?)`.
 
 ## Security
 
