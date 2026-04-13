@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
 
 export interface User {
   id: string;
@@ -67,8 +68,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { fetchUser(); }, [fetchUser]);
 
   const login = useCallback(async () => {
-    await WebBrowser.openBrowserAsync(`${BASE}/api/login`);
-    await fetchUser();
+    try {
+      // Create a deep link URL that Expo can handle — the backend will redirect here after auth,
+      // which tells openAuthSessionAsync to close the browser and return to the app automatically.
+      const redirectUrl = Linking.createURL("/");
+      const loginUrl = `${BASE}/api/login?mobileReturnTo=${encodeURIComponent(redirectUrl)}`;
+
+      await WebBrowser.openAuthSessionAsync(loginUrl, redirectUrl);
+    } catch {
+      // Ignore errors (e.g. user cancelled)
+    } finally {
+      // Always re-check session — auth may have completed even if the browser closed unexpectedly
+      await fetchUser();
+    }
   }, [fetchUser]);
 
   const logout = useCallback(async () => {
