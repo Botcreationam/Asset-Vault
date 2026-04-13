@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { BASE_URL } from "@/lib/api";
+import { BASE_URL, authFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Star, MessageSquare, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -78,7 +78,7 @@ export function ResourceRatings({ resourceId }: { resourceId: string }) {
 
   const fetchRatings = useCallback(async () => {
     try {
-      const res = await fetch(`${BASE_URL}api/resources/${resourceId}/ratings`, {
+      const res = await authFetch(`${BASE_URL}api/resources/${resourceId}/ratings`, {
         credentials: "include",
       });
       const d = await res.json();
@@ -105,7 +105,7 @@ export function ResourceRatings({ resourceId }: { resourceId: string }) {
     }
     setSubmitting(true);
     try {
-      const res = await fetch(`${BASE_URL}api/resources/${resourceId}/ratings`, {
+      const res = await authFetch(`${BASE_URL}api/resources/${resourceId}/ratings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -124,7 +124,7 @@ export function ResourceRatings({ resourceId }: { resourceId: string }) {
 
   const handleDelete = async () => {
     try {
-      await fetch(`${BASE_URL}api/resources/${resourceId}/ratings`, {
+      await authFetch(`${BASE_URL}api/resources/${resourceId}/ratings`, {
         method: "DELETE",
         credentials: "include",
       });

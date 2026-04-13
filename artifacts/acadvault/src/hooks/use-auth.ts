@@ -18,19 +18,36 @@ interface DbUser {
 /**
  * Drop-in replacement for the Replit Auth useAuth() hook.
  * Combines Clerk authentication with DB user data (role, username, units).
+ * Uses Bearer token auth for reliable session passing across Replit's proxy.
  */
 export function useAuth() {
   const { user: clerkUser, isLoaded, isSignedIn } = useUser();
-  const { signOut } = useClerk();
+  const { signOut, session } = useClerk();
   const [, setLocation] = useLocation();
 
   const { data: dbData, isLoading: dbLoading } = useQuery<{ authenticated: boolean; user?: DbUser }>({
-    queryKey: ["/api/auth/user"],
+    queryKey: ["/api/auth/user", session?.id],
     queryFn: async () => {
-      const res = await fetch(`${BASE_URL}api/auth/user`, { credentials: "include" });
+      let token: string | null = null;
+      try {
+        token = await session?.getToken() ?? null;
+      } catch {
+        token = null;
+      }
+
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`${BASE_URL}api/auth/user`, {
+        credentials: "include",
+        headers,
+      });
+      if (!res.ok) return { authenticated: false };
       return res.json();
     },
-    enabled: isLoaded && !!isSignedIn,
+    enabled: isLoaded && !!isSignedIn && !!session,
     staleTime: 30_000,
     refetchOnWindowFocus: true,
   });

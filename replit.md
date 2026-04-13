@@ -18,6 +18,10 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 - **Auth**: Clerk (JWT sessions) — `@clerk/express` on backend, `@clerk/react` on frontend
+  - **Token delivery**: Bearer token via `Authorization: Bearer <token>` header (more reliable than cookies through Replit's proxy)
+  - `ClerkAuthSync` component in `App.tsx` registers `session.getToken()` as global auth getter via `setAuthTokenGetter`
+  - All API calls use `authFetch` (from `@/lib/api`) which auto-attaches the Bearer token
+  - `use-auth.ts` passes token directly for the initial `/api/auth/user` call
 - **File Storage**: Google Cloud Storage (Replit App Storage) via `@google-cloud/storage`
 - **Frontend**: React + Vite + Tailwind CSS + shadcn/ui
 

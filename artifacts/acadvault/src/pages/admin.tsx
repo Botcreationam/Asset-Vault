@@ -70,7 +70,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { BASE_URL } from "@/lib/api";
+import { BASE_URL, authFetch } from "@/lib/api";
 
 const folderSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -471,7 +471,7 @@ function FilesTab() {
   const fetchResources = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}api/admin/resources`, { credentials: "include" });
+      const res = await authFetch(`${BASE_URL}api/admin/resources`, { credentials: "include" });
       const data = await res.json();
       setResources(data.resources || []);
     } catch {
@@ -509,7 +509,7 @@ function FilesTab() {
   const handleEditResource = async () => {
     if (!editingResource || !editResName.trim()) return;
     try {
-      const res = await fetch(`${BASE_URL}api/resources/${editingResource.id}`, {
+      const res = await authFetch(`${BASE_URL}api/resources/${editingResource.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -779,7 +779,7 @@ function FoldersTab({ folders, refetch }: { folders: any[]; refetch: () => void 
 
   const fetchAllFolders = async () => {
     try {
-      const res = await fetch(`${BASE_URL}api/folders/all`, { credentials: "include" });
+      const res = await authFetch(`${BASE_URL}api/folders/all`, { credentials: "include" });
       const data = await res.json();
       setAllFolders(data.folders || []);
     } catch {
@@ -821,7 +821,7 @@ function FoldersTab({ folders, refetch }: { folders: any[]; refetch: () => void 
 
   const handleRename = async (folder: any, data: { name: string; description: string }) => {
     try {
-      const res = await fetch(`${BASE_URL}api/folders/${folder.id}`, {
+      const res = await authFetch(`${BASE_URL}api/folders/${folder.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -1122,7 +1122,7 @@ function AnalyticsTab() {
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}api/admin/analytics`, { credentials: "include" });
+      const res = await authFetch(`${BASE_URL}api/admin/analytics`, { credentials: "include" });
       const d = await res.json();
       setData(d);
     } catch {
@@ -1289,7 +1289,7 @@ function AuditLogTab() {
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}api/admin/audit-logs`, { credentials: "include" });
+      const res = await authFetch(`${BASE_URL}api/admin/audit-logs`, { credentials: "include" });
       const data = await res.json();
       setLogs(data.logs || []);
     } catch {

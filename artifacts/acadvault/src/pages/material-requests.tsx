@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { AuthWrapper } from "@/components/auth-wrapper";
-import { BASE_URL } from "@/lib/api";
+import { BASE_URL, authFetch } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -58,7 +58,7 @@ export default function MaterialRequestsPage() {
 
   const fetchRequests = useCallback(async () => {
     try {
-      const res = await fetch(`${BASE_URL}api/material-requests`, { credentials: "include" });
+      const res = await authFetch(`${BASE_URL}api/material-requests`, { credentials: "include" });
       const data = await res.json();
       setRequests(data.requests || []);
     } catch {
@@ -77,7 +77,7 @@ export default function MaterialRequestsPage() {
     if (!form.title.trim()) return;
     setSubmitting(true);
     try {
-      const res = await fetch(`${BASE_URL}api/material-requests`, {
+      const res = await authFetch(`${BASE_URL}api/material-requests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -99,7 +99,7 @@ export default function MaterialRequestsPage() {
     const status = adminStatusMap[id];
     if (!status) return;
     try {
-      const res = await fetch(`${BASE_URL}api/material-requests/${id}`, {
+      const res = await authFetch(`${BASE_URL}api/material-requests/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
