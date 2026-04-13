@@ -1,14 +1,22 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import * as WebBrowser from "expo-web-browser";
 
-interface User {
+export interface User {
   id: string;
   username?: string;
   firstName?: string;
   lastName?: string;
   profileImageUrl?: string;
-  role: "student" | "admin";
+  role: "student" | "moderator" | "admin";
   unitsBalance: number;
+  nickname?: string | null;
+  program?: string | null;
+  academicYear?: string | null;
+  semester?: string | null;
+  onboardingCompleted?: boolean;
+  isTrialActive: boolean;
+  trialDaysRemaining: number;
+  trialEndsAt: string;
 }
 
 interface AuthContextType {
@@ -42,10 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchUser = useCallback(async () => {
     try {
       const res = await fetch(`${BASE}/api/auth/user`, { credentials: "include" });
-      if (!res.ok) {
-        setUser(null);
-        return;
-      }
+      if (!res.ok) { setUser(null); return; }
       const data = await res.json();
       if (data.authenticated && data.user) {
         setUser(data.user);
@@ -59,9 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  useEffect(() => {
-    fetchUser();
-  }, [fetchUser]);
+  useEffect(() => { fetchUser(); }, [fetchUser]);
 
   const login = useCallback(async () => {
     await WebBrowser.openBrowserAsync(`${BASE}/api/login`);
@@ -69,23 +72,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchUser]);
 
   const logout = useCallback(async () => {
-    try {
-      await fetch(`${BASE}/api/logout`, { credentials: "include" });
-    } catch {}
+    try { await fetch(`${BASE}/api/logout`, { credentials: "include" }); } catch {}
     setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated: !!user,
-        login,
-        logout,
-        refetch: fetchUser,
-      }}
-    >
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, login, logout, refetch: fetchUser }}>
       {children}
     </AuthContext.Provider>
   );
