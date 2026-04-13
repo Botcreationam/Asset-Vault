@@ -252,29 +252,29 @@ export default function Account() {
           </Card>
 
           {/* Balance Card */}
-          <Card className="md:col-span-2 bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-xl border-none relative overflow-hidden">
+          <Card className="md:col-span-2 bg-gradient-to-br from-[#142042] to-[#1a3060] text-white shadow-xl border-none relative overflow-hidden">
             <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-1/3 -translate-y-1/4">
               <Zap className="w-64 h-64" />
             </div>
             <CardHeader>
-              <CardTitle className="text-primary-foreground/80 flex items-center gap-2 text-lg font-normal">
+              <CardTitle className="text-white/80 flex items-center gap-2 text-lg font-normal">
                 <Wallet className="w-5 h-5" /> Available Units
               </CardTitle>
             </CardHeader>
             <CardContent>
               {isLoadingBalance ? (
-                <Skeleton className="h-16 w-32 bg-primary-foreground/20 rounded-xl" />
+                <Skeleton className="h-16 w-32 bg-white/20 rounded-xl" />
               ) : (
                 <div className="flex items-baseline gap-2">
                   <span className="text-6xl font-bold tracking-tight">
                     {balanceData?.balance || 0}
                   </span>
-                  <span className="text-xl text-primary-foreground/80 font-medium">
+                  <span className="text-xl text-white/80 font-medium">
                     units
                   </span>
                 </div>
               )}
-              <p className="mt-6 text-primary-foreground/70 max-w-md text-sm leading-relaxed">
+              <p className="mt-6 text-white/70 max-w-md text-sm leading-relaxed">
                 Units are used to download premium academic resources. You
                 receive 50 free units when you first join. Contact an
                 administrator for more units.

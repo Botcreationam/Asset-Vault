@@ -116,7 +116,7 @@ export default function Onboarding() {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Left branding panel */}
-      <div className="hidden lg:flex lg:w-5/12 bg-primary flex-col items-center justify-center p-12 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-5/12 bg-[#142042] flex-col items-center justify-center p-12 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-10 left-10 w-64 h-64 rounded-full bg-white/20 blur-3xl" />
           <div className="absolute bottom-20 right-10 w-80 h-80 rounded-full bg-accent/30 blur-3xl" />
@@ -155,8 +155,8 @@ export default function Onboarding() {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-              <BookOpen className="w-5 h-5 text-primary-foreground" />
+            <div className="w-10 h-10 rounded-xl bg-[#142042] flex items-center justify-center">
+              <BookOpen className="w-5 h-5 text-white" />
             </div>
             <span className="font-serif text-xl font-bold">AcadVault</span>
           </div>
