@@ -17,7 +17,7 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
-- **Auth**: Replit Auth (OIDC/PKCE) via `@workspace/replit-auth-web`
+- **Auth**: Clerk (JWT sessions) — `@clerk/express` on backend, `@clerk/react` on frontend
 - **File Storage**: Google Cloud Storage (Replit App Storage) via `@google-cloud/storage`
 - **Frontend**: React + Vite + Tailwind CSS + shadcn/ui
 
@@ -33,8 +33,7 @@ artifacts-monorepo/
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
 │   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   ├── db/                 # Drizzle ORM schema + DB connection
-│   └── replit-auth-web/    # Replit Auth browser package
+│   └── db/                 # Drizzle ORM schema + DB connection (replit-auth-web removed)
 ├── pnpm-workspace.yaml
 ├── tsconfig.base.json
 ├── tsconfig.json
@@ -43,8 +42,7 @@ artifacts-monorepo/
 
 ## Database Schema
 
-- **users** — Replit Auth users (id, username, email, firstName, lastName, profileImageUrl, role: student|moderator|admin)
-- **sessions** — Auth sessions (Replit Auth managed)
+- **users** — Clerk-synced users (id = Clerk userId, username, email, firstName, lastName, profileImageUrl, role: student|moderator|admin)
 - **folders** — Hierarchical folder structure (id, name, description, parentId, level, icon)
 - **resources** — Academic files (id, name, type, folderId, storagePath, fileSize, mimeType, downloadCost, tags, viewCount, downloadCount)
 - **user_units** — Unit balances per user
@@ -86,7 +84,7 @@ artifacts-monorepo/
 - **Security Headers**: X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy on all responses
 - **Atomic Balance Operations**: Download deductions use SQL `WHERE balance >= cost` to prevent race conditions
 - **Input Validation**: Post max 2000 chars, comment max 1000 chars, message max 5000 chars, MIME validation on uploads
-- **WebSocket Protection**: Max 5 connections per user, session-cookie auth required
+- **WebSocket Protection**: Max 5 connections per user, Clerk session token required on upgrade
 - **Self-Service Topup Disabled**: Only admins can topup units; prevents free-unit abuse
 - **Search Sanitization**: LIKE wildcards (`%`, `_`) stripped from search input
 
@@ -124,8 +122,9 @@ artifacts-monorepo/
 All routes at `/api`:
 
 - `GET /healthz` — health check
-- `GET /auth/user` — current user + units balance
-- `GET /login`, `GET /callback`, `GET /logout` — Replit Auth OIDC flow
+- `GET /auth/user` — current user + units balance (Clerk session required)
+- `PATCH /auth/profile` — update username/firstName/lastName
+- `POST /auth/profile-photo` — upload profile photo (multipart)
 - `GET/POST /folders` — list root folders / create folder (admin)
 - `GET/DELETE /folders/:id` — get/delete folder
 - `GET /folder-path/:id` — breadcrumb path
