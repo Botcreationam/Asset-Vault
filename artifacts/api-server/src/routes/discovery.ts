@@ -194,4 +194,75 @@ router.get("/users/me/downloads", async (req, res) => {
   }
 });
 
+// GET /discovery/for-you — resources from folders matching user's program/year/semester
+router.get("/discovery/for-you", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.json({ resources: [] });
+    return;
+  }
+
+  const { program, academicYear, semester } = req.user;
+  if (!program && !academicYear && !semester) {
+    res.json({ resources: [] });
+    return;
+  }
+
+  try {
+    // Find folders whose names match the user's program, year, or semester keywords
+    const { foldersTable } = await import("@workspace/db/schema");
+    const { ilike, or } = await import("drizzle-orm");
+
+    const conditions: any[] = [];
+    if (program) {
+      const words = program.split(/\s+/).filter((w: string) => w.length > 2);
+      words.forEach((w: string) =>
+        conditions.push(ilike(foldersTable.name, `%${w}%`))
+      );
+    }
+    if (academicYear) {
+      conditions.push(ilike(foldersTable.name, `%year ${academicYear}%`));
+      conditions.push(ilike(foldersTable.name, `%${academicYear} year%`));
+      conditions.push(ilike(foldersTable.name, `%year${academicYear}%`));
+    }
+    if (semester) {
+      conditions.push(ilike(foldersTable.name, `%semester ${semester}%`));
+      conditions.push(ilike(foldersTable.name, `%sem ${semester}%`));
+    }
+
+    if (conditions.length === 0) {
+      res.json({ resources: [] });
+      return;
+    }
+
+    const matchingFolders = await db
+      .select({ id: foldersTable.id })
+      .from(foldersTable)
+      .where(or(...conditions));
+
+    if (matchingFolders.length === 0) {
+      res.json({ resources: [] });
+      return;
+    }
+
+    const { inArray } = await import("drizzle-orm");
+    const folderIds = matchingFolders.map((f: { id: string }) => f.id);
+
+    const rows = await db
+      .select(RESOURCE_FIELDS)
+      .from(resourcesTable)
+      .where(
+        and(
+          eq(resourcesTable.isActive, true),
+          inArray(resourcesTable.folderId, folderIds),
+        ),
+      )
+      .orderBy(desc(resourcesTable.downloadCount))
+      .limit(8);
+
+    res.json({ resources: rows.map(formatResource) });
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

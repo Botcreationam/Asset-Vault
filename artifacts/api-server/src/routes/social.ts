@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { isContentManager } from "../lib/roles";
+import { moderateContent } from "../lib/moderation";
 import { db, usersTable } from "@workspace/db";
 import {
   postsTable,
@@ -101,6 +102,12 @@ router.post("/social/posts", postRateLimit, async (req, res) => {
 
   if (content.length > MAX_POST_LENGTH) {
     res.status(400).json({ error: `Content too long (max ${MAX_POST_LENGTH} chars)` });
+    return;
+  }
+
+  const modResult = moderateContent(content);
+  if (!modResult.ok) {
+    res.status(422).json({ error: modResult.reason });
     return;
   }
 
@@ -232,6 +239,12 @@ router.post("/social/posts/:postId/comments", commentRateLimit, async (req, res)
 
   if (content.length > MAX_COMMENT_LENGTH) {
     res.status(400).json({ error: `Comment too long (max ${MAX_COMMENT_LENGTH} chars)` });
+    return;
+  }
+
+  const modResult = moderateContent(content);
+  if (!modResult.ok) {
+    res.status(422).json({ error: modResult.reason });
     return;
   }
 

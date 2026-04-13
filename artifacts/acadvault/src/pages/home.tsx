@@ -16,6 +16,7 @@ import {
   Download,
   FileStack,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -149,11 +150,12 @@ function ResourceRow({
 }
 
 export default function Home() {
-  const { isAuthenticated, login } = useAuth();
+  const { isAuthenticated, login, user } = useAuth();
   const { data: stats, isLoading: loadingStats } = useStats();
   const { data: trending, isLoading: loadingTrending } = useDiscovery("api/discovery/trending");
   const { data: topRated, isLoading: loadingTopRated } = useDiscovery("api/discovery/top-rated");
   const { data: recent, isLoading: loadingRecent } = useDiscovery("api/discovery/recent");
+  const { data: forYou, isLoading: loadingForYou } = useDiscovery("api/discovery/for-you");
 
   return (
     <div className="flex flex-col gap-10 pb-12">
@@ -261,6 +263,24 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* For You row — only shown when user has academic profile */}
+      {isAuthenticated && user?.onboardingCompleted && user?.program && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="w-4 h-4 text-accent" />
+            <span className="text-xs font-semibold text-accent uppercase tracking-wider">Personalised for you</span>
+          </div>
+          <ResourceRow
+            title={`${user.program} · Year ${user.academicYear} · Sem ${user.semester}`}
+            icon={Sparkles}
+            iconColor="text-accent"
+            data={forYou?.resources}
+            isLoading={loadingForYou}
+            viewAllHref="/browse"
+          />
+        </div>
+      )}
 
       {/* Discovery Rows */}
       <ResourceRow

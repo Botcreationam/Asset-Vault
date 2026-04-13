@@ -85,7 +85,15 @@ export async function authMiddleware(
   }
 
   const [dbUser] = await db
-    .select({ role: usersTable.role, username: usersTable.username })
+    .select({
+      role: usersTable.role,
+      username: usersTable.username,
+      nickname: usersTable.nickname,
+      program: usersTable.program,
+      academicYear: usersTable.academicYear,
+      semester: usersTable.semester,
+      onboardingCompleted: usersTable.onboardingCompleted,
+    })
     .from(usersTable)
     .where(eq(usersTable.id, refreshed.user.id));
 
@@ -93,6 +101,11 @@ export async function authMiddleware(
     ...refreshed.user,
     role: (dbUser?.role ?? "student") as "student" | "moderator" | "admin",
     username: dbUser?.username ?? undefined,
+    nickname: dbUser?.nickname ?? null,
+    program: dbUser?.program ?? null,
+    academicYear: dbUser?.academicYear ?? null,
+    semester: dbUser?.semester ?? null,
+    onboardingCompleted: dbUser?.onboardingCompleted ?? false,
     unitsBalance: 0,
   };
   next();
