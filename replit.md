@@ -17,11 +17,7 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
-- **Auth**: Replit Auth (OIDC/PKCE) — `openid-client` v6 on backend, `@workspace/replit-auth-web` on frontend
-  - Cookie-based sessions stored in PostgreSQL `sessions` table
-  - `authMiddleware` loads user from session on every request; augments `req.user` with fresh `role` + `unitsBalance` from DB
-  - All API calls use `authFetch` (from `@/lib/api`) with `credentials: "include"` for session cookies
-  - WebSocket auth reads session cookie from the HTTP upgrade request headers
+- **Auth**: Replit Auth (OIDC/PKCE) via `@workspace/replit-auth-web`
 - **File Storage**: Google Cloud Storage (Replit App Storage) via `@google-cloud/storage`
 - **Frontend**: React + Vite + Tailwind CSS + shadcn/ui
 
@@ -37,7 +33,8 @@ artifacts-monorepo/
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
 │   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   └── db/                 # Drizzle ORM schema + DB connection (replit-auth-web removed)
+│   ├── db/                 # Drizzle ORM schema + DB connection
+│   └── replit-auth-web/    # Replit Auth browser package
 ├── pnpm-workspace.yaml
 ├── tsconfig.base.json
 ├── tsconfig.json
@@ -46,7 +43,8 @@ artifacts-monorepo/
 
 ## Database Schema
 
-- **users** — Clerk-synced users (id = Clerk userId, username, email, firstName, lastName, profileImageUrl, role: student|moderator|admin)
+- **users** — Replit Auth users (id, username, email, firstName, lastName, profileImageUrl, role: student|moderator|admin)
+- **sessions** — Auth sessions (Replit Auth managed)
 - **folders** — Hierarchical folder structure (id, name, description, parentId, level, icon)
 - **resources** — Academic files (id, name, type, folderId, storagePath, fileSize, mimeType, downloadCost, tags, viewCount, downloadCount)
 - **user_units** — Unit balances per user
@@ -88,7 +86,7 @@ artifacts-monorepo/
 - **Security Headers**: X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy on all responses
 - **Atomic Balance Operations**: Download deductions use SQL `WHERE balance >= cost` to prevent race conditions
 - **Input Validation**: Post max 2000 chars, comment max 1000 chars, message max 5000 chars, MIME validation on uploads
-- **WebSocket Protection**: Max 5 connections per user, Clerk session token required on upgrade
+- **WebSocket Protection**: Max 5 connections per user, session-cookie auth required
 - **Self-Service Topup Disabled**: Only admins can topup units; prevents free-unit abuse
 - **Search Sanitization**: LIKE wildcards (`%`, `_`) stripped from search input
 
@@ -126,9 +124,8 @@ artifacts-monorepo/
 All routes at `/api`:
 
 - `GET /healthz` — health check
-- `GET /auth/user` — current user + units balance (Clerk session required)
-- `PATCH /auth/profile` — update username/firstName/lastName
-- `POST /auth/profile-photo` — upload profile photo (multipart)
+- `GET /auth/user` — current user + units balance
+- `GET /login`, `GET /callback`, `GET /logout` — Replit Auth OIDC flow
 - `GET/POST /folders` — list root folders / create folder (admin)
 - `GET/DELETE /folders/:id` — get/delete folder
 - `GET /folder-path/:id` — breadcrumb path

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@workspace/replit-auth-web";
 import {
   useListConversations,
   useCreateConversation,

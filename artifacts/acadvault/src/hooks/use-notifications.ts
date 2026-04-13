@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { authFetch, BASE_URL } from "@/lib/api";
+import { BASE_URL } from "@/lib/api";
 
 export interface AppNotification {
   id: number;
@@ -19,7 +19,9 @@ export function useNotifications(isAuthenticated: boolean) {
   const fetchNotifications = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
-      const res = await authFetch(`${BASE_URL}api/notifications`);
+      const res = await fetch(`${BASE_URL}api/notifications`, {
+        credentials: "include",
+      });
       if (!res.ok) return;
       const data = await res.json();
       setNotifications(data.notifications || []);
@@ -35,7 +37,10 @@ export function useNotifications(isAuthenticated: boolean) {
 
   const markAllRead = useCallback(async () => {
     try {
-      await authFetch(`${BASE_URL}api/notifications/read-all`, { method: "PATCH" });
+      await fetch(`${BASE_URL}api/notifications/read-all`, {
+        method: "PATCH",
+        credentials: "include",
+      });
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
     } catch {}
@@ -43,7 +48,10 @@ export function useNotifications(isAuthenticated: boolean) {
 
   const markRead = useCallback(async (id: number) => {
     try {
-      await authFetch(`${BASE_URL}api/notifications/${id}/read`, { method: "PATCH" });
+      await fetch(`${BASE_URL}api/notifications/${id}/read`, {
+        method: "PATCH",
+        credentials: "include",
+      });
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
       );

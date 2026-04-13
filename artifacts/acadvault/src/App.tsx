@@ -26,8 +26,6 @@ const queryClient = new QueryClient({
   },
 });
 
-const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
-
 function Router() {
   return (
     <AppLayout>
@@ -50,14 +48,14 @@ function Router() {
 
 function App() {
   return (
-    <WouterRouter base={basePath}>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Router />
-        </TooltipProvider>
+        </WouterRouter>
         <Toaster />
-      </QueryClientProvider>
-    </WouterRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 

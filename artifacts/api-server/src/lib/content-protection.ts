@@ -62,7 +62,7 @@ export async function enforceDeviceLimit(req: Request, res: Response, next: Next
     }
 
     const userId = req.user.id;
-    const sessionId = req.user.id;
+    const sessionId = (req as any).sessionID || req.cookies?.["connect.sid"] || "unknown";
     const fingerprint = generateDeviceFingerprint(req);
     const ip = req.ip || req.socket.remoteAddress || "unknown";
     const ua = (req.headers["user-agent"] || "").slice(0, 500);
