@@ -20,4 +20,7 @@ export interface AuthUser {
   academicYear?: string | null;
   semester?: string | null;
   onboardingCompleted?: boolean;
+  isTrialActive: boolean;
+  trialDaysRemaining: number;
+  trialEndsAt: string;
 }

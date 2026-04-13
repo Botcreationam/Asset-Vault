@@ -453,45 +453,58 @@ router.post("/resources/:resourceId/download", downloadRateLimit, async (req, re
       return;
     }
 
-    await ensureUserUnits(req.user.id);
     const cost = resource.downloadCost;
+    const isTrial = req.user.isTrialActive;
 
-    const [updated] = await db
-      .update(userUnitsTable)
-      .set({
-        balance: sql`${userUnitsTable.balance} - ${cost}`,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(userUnitsTable.userId, req.user.id),
-          sql`${userUnitsTable.balance} >= ${cost}`,
-        ),
-      )
-      .returning({ balance: userUnitsTable.balance });
+    let newBalance: number;
 
-    if (!updated) {
+    if (isTrial) {
+      // Trial users download for free — just get current balance for response
+      await ensureUserUnits(req.user.id);
       const [current] = await db
         .select({ balance: userUnitsTable.balance })
         .from(userUnitsTable)
         .where(eq(userUnitsTable.userId, req.user.id));
-      res.status(402).json({
-        error: "Insufficient units",
-        balance: current?.balance ?? 0,
-        required: cost,
+      newBalance = current?.balance ?? 0;
+    } else {
+      await ensureUserUnits(req.user.id);
+      const [updated] = await db
+        .update(userUnitsTable)
+        .set({
+          balance: sql`${userUnitsTable.balance} - ${cost}`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(userUnitsTable.userId, req.user.id),
+            sql`${userUnitsTable.balance} >= ${cost}`,
+          ),
+        )
+        .returning({ balance: userUnitsTable.balance });
+
+      if (!updated) {
+        const [current] = await db
+          .select({ balance: userUnitsTable.balance })
+          .from(userUnitsTable)
+          .where(eq(userUnitsTable.userId, req.user.id));
+        res.status(402).json({
+          error: "Insufficient units",
+          balance: current?.balance ?? 0,
+          required: cost,
+        });
+        return;
+      }
+
+      newBalance = updated.balance;
+
+      await db.insert(unitsTransactionsTable).values({
+        userId: req.user.id,
+        type: "debit",
+        amount: cost,
+        description: `Downloaded: ${resource.name}`,
+        resourceId: resource.id,
       });
-      return;
     }
-
-    const newBalance = updated.balance;
-
-    await db.insert(unitsTransactionsTable).values({
-      userId: req.user.id,
-      type: "debit",
-      amount: cost,
-      description: `Downloaded: ${resource.name}`,
-      resourceId: resource.id,
-    });
 
     await db
       .update(resourcesTable)
@@ -505,8 +518,9 @@ router.post("/resources/:resourceId/download", downloadRateLimit, async (req, re
     res.json({
       url,
       expiresAt: expiresAt.toISOString(),
-      unitsSpent: cost,
+      unitsSpent: isTrial ? 0 : cost,
       newBalance,
+      trialDownload: isTrial,
     });
   } catch (err) {
     req.log.error({ err }, "Failed to process download");

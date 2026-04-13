@@ -3,6 +3,7 @@ import { type Request, type Response, type NextFunction } from "express";
 import type { AuthUser } from "@workspace/api-zod";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { getTrialInfo } from "../lib/trial";
 import {
   clearSession,
   getOidcConfig,
@@ -93,9 +94,12 @@ export async function authMiddleware(
       academicYear: usersTable.academicYear,
       semester: usersTable.semester,
       onboardingCompleted: usersTable.onboardingCompleted,
+      createdAt: usersTable.createdAt,
     })
     .from(usersTable)
     .where(eq(usersTable.id, refreshed.user.id));
+
+  const trial = getTrialInfo(dbUser?.createdAt ?? new Date());
 
   req.user = {
     ...refreshed.user,
@@ -107,6 +111,9 @@ export async function authMiddleware(
     semester: dbUser?.semester ?? null,
     onboardingCompleted: dbUser?.onboardingCompleted ?? false,
     unitsBalance: 0,
+    isTrialActive: trial.isActive,
+    trialDaysRemaining: trial.daysRemaining,
+    trialEndsAt: trial.endsAt.toISOString(),
   };
   next();
 }
