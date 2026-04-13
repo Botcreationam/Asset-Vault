@@ -1,6 +1,6 @@
 import { ReactNode, useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 import { useNotifications } from "@/hooks/use-notifications";
 import { 

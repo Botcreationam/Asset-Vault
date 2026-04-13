@@ -1,30 +1,49 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { Server } from "http";
-import { getSession, getSessionId } from "./auth";
-import cookie from "cookie";
+import { createClerkClient } from "@clerk/express";
+import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+
+const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
 const userConnections = new Map<string, Set<WebSocket>>();
 const MAX_CONNECTIONS_PER_USER = 5;
+
+async function getUserIdFromRequest(req: any): Promise<string | null> {
+  try {
+    const requestState = await clerkClient.authenticateRequest(req, {
+      secretKey: process.env.CLERK_SECRET_KEY,
+    });
+    if (!requestState.isSignedIn) return null;
+    const auth = requestState.toAuth();
+    const userId = (auth?.sessionClaims?.userId as string | undefined) || auth?.userId;
+    return userId || null;
+  } catch {
+    return null;
+  }
+}
 
 export function setupWebSocket(server: Server) {
   const wss = new WebSocketServer({ server, path: "/api/ws" });
 
   wss.on("connection", async (ws, req) => {
-    const cookies = cookie.parse(req.headers.cookie || "");
-    const sid = cookies["sid"];
+    const userId = await getUserIdFromRequest(req);
 
-    if (!sid) {
+    if (!userId) {
       ws.close(4001, "Not authenticated");
       return;
     }
 
-    const session = await getSession(sid);
-    if (!session?.user?.id) {
+    // Verify user exists in our DB
+    const [dbUser] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+
+    if (!dbUser) {
       ws.close(4001, "Not authenticated");
       return;
     }
-
-    const userId = session.user.id;
 
     if (!userConnections.has(userId)) {
       userConnections.set(userId, new Set());

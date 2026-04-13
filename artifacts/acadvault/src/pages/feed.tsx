@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@/hooks/use-auth";
 import { useCreatePost, useToggleReaction, useListComments, useCreateComment, useDeletePost } from "@workspace/api-client-react";
 import { AuthWrapper } from "@/components/auth-wrapper";
 import { useQueryClient } from "@tanstack/react-query";

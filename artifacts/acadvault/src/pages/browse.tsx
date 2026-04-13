@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useRoute } from "wouter";
 import { Link } from "wouter";
 import { useListFolders, useListResources, useGetFolderPath, useCreateFolder, useDeleteFolder, useDeleteResource } from "@workspace/api-client-react";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@/hooks/use-auth";
 import { AuthWrapper } from "@/components/auth-wrapper";
 import { formatDistanceToNow } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";

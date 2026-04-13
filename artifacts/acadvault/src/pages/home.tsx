@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@/hooks/use-auth";
 import { motion } from "framer-motion";
 import { ArrowRight, BookOpen, Library, Search, Shield, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";

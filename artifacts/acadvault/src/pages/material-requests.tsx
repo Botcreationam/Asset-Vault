@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { AuthWrapper } from "@/components/auth-wrapper";
 import { BASE_URL } from "@/lib/api";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { PackageSearch, Plus, Loader2, CheckCircle2, Clock, XCircle, RefreshCw } from "lucide-react";

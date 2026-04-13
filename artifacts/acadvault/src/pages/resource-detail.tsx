@@ -1,5 +1,5 @@
 import { useRoute, Link } from "wouter";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@/hooks/use-auth";
 import {
   useGetResource,
   useDownloadResource,
