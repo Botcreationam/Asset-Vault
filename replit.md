@@ -185,15 +185,22 @@ React + Vite frontend. Pages in `src/pages/`:
 
 ### `artifacts/acadvault-mobile` (`@workspace/acadvault-mobile`)
 
-Expo React Native mobile app. Connects to the same API server as the web frontend.
+Expo React Native mobile app. Fully optimized for native mobile experience.
 
 - **Font**: Plus Jakarta Sans (matching web app)
-- **Design tokens**: Synced from web CSS (navy blue/gold academic theme)
-- **Auth**: Uses `expo-web-browser` for Replit Auth login flow; checks `/api/auth/user` for session
-- **Navigation**: 4 tabs — Library (folder browser), Search, Feed (social posts), Account (profile + balance)
-- **Resource detail**: Stack screen at `/resource/[id]` with view-free + paid-download actions
+- **Design tokens**: Navy `#142042`, gold `#D9A014`, dark `#0B1120` — synced from web app
+- **Auth**: `AuthContext.tsx` — uses `expo-web-browser` for Replit Auth; User type includes `isTrialActive`, `trialDaysRemaining`, `trialEndsAt`, `role: student|moderator|admin`, `nickname`, `program`, `academicYear`, `semester`, `onboardingCompleted`
+- **Navigation**: Bottom tab bar (NativeTabs on iOS 26 with liquid glass, BlurView fallback on older iOS, classic on Android)
+- **Library tab**: Discovery home with branded navy hero card + trial badge + trending/recent horizontal carousels; folder browser with breadcrumb nav when drilling into a folder
+- **Feed tab**: Compose post box with avatar, full comment support (view + add inline per post), like with haptic feedback
+- **Search tab**: Live debounced search (350ms), type filter chips (All/PDF/Notes/Books/Slides/Videos), no submit button needed
+- **Account tab**: Gradient profile hero card, trial status card (amber when active), units balance card, academic profile, transaction history, pull-to-refresh
+- **Resource detail**: Trial-aware download — free amber button during trial; normal cost card with balance check when trial is over
 - **API connection**: `setBaseUrl` from `@workspace/api-client-react` with `EXPO_PUBLIC_DOMAIN` env var
+- **Discovery API**: Uses `/api/discovery/trending` and `/api/discovery/recent` for home carousels
+- **Comments API**: Uses `/api/social/posts/:id/comments` GET/POST for inline comment threads
 - **CORS**: API server allows `REPLIT_EXPO_DEV_DOMAIN` origin for cross-domain mobile web preview
+- **Safe areas**: `useSafeAreaInsets()` used throughout; all screens respect bottom tab bar height (110px padding)
 
 ### `lib/db` (`@workspace/db`)
 

@@ -11,12 +11,23 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/contexts/ApiContext";
 import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
+
+const TYPE_ICONS: Record<string, string> = {
+  pdf: "document-text",
+  slides: "easel",
+  book: "book",
+  notes: "create",
+  video: "videocam",
+  other: "document",
+};
 
 const TYPE_COLORS: Record<string, string> = {
   pdf: "#EF4444",
@@ -33,15 +44,23 @@ function formatBytes(bytes?: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function StatPill({ icon, label, colors }: { icon: string; label: string; colors: any }) {
+  return (
+    <View style={[styles.statPill, { backgroundColor: colors.muted }]}>
+      <Ionicons name={icon as any} size={13} color={colors.mutedForeground} />
+      <Text style={[styles.statText, { color: colors.mutedForeground }]}>{label}</Text>
+    </View>
+  );
+}
+
 export default function ResourceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const router = useRouter();
   const { user, refetch: refetchAuth } = useAuth();
-  const { apiFetch, baseUrl } = useApi();
+  const { apiFetch } = useApi();
   const queryClient = useQueryClient();
-  const [downloading, setDownloading] = useState(false);
-  const isWeb = Platform.OS === "web";
+  const insets = useSafeAreaInsets();
 
   const { data: resource, isLoading } = useQuery({
     queryKey: ["resource", id],
@@ -64,7 +83,7 @@ export default function ResourceDetailScreen() {
       await WebBrowser.openBrowserAsync(data.url);
     },
     onError: (err: Error) => {
-      Alert.alert("Download failed", err.message);
+      Alert.alert("Download Failed", err.message);
     },
   });
 
@@ -74,23 +93,38 @@ export default function ResourceDetailScreen() {
       const data = await res.json();
       await WebBrowser.openBrowserAsync(data.url);
     } catch {
-      Alert.alert("Error", "Could not open viewer");
+      Alert.alert("Error", "Could not open the viewer. Please try again.");
     }
   };
 
   const handleDownload = () => {
     if (!resource) return;
+    const isTrial = user?.isTrialActive;
     const balance = user?.unitsBalance ?? 0;
-    if (balance < resource.downloadCost) {
+
+    if (isTrial) {
       Alert.alert(
-        "Not enough units",
-        `You need ${resource.downloadCost} units but have ${balance}. Ask an admin to top up your balance.`
+        "Free Trial Download",
+        `Download "${resource.name}" for free — your trial is active!`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Download Free", onPress: () => downloadMutation.mutate() },
+        ]
       );
       return;
     }
+
+    if (balance < resource.downloadCost) {
+      Alert.alert(
+        "Not Enough Units",
+        `You need ${resource.downloadCost} units but only have ${balance}. Contact an admin to top up your balance.`
+      );
+      return;
+    }
+
     Alert.alert(
       "Confirm Download",
-      `This will cost ${resource.downloadCost} units. Your balance after: ${balance - resource.downloadCost} units.`,
+      `Download "${resource.name}" for ${resource.downloadCost} units?\n\nBalance after: ${balance - resource.downloadCost} units.`,
       [
         { text: "Cancel", style: "cancel" },
         { text: "Download", onPress: () => downloadMutation.mutate() },
@@ -109,128 +143,143 @@ export default function ResourceDetailScreen() {
   if (!resource) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.background }]}>
-        <Ionicons name="alert-circle" size={48} color={colors.mutedForeground} />
-        <Text style={[styles.errorText, { color: colors.foreground }]}>Resource not found</Text>
-        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16 }}>
-          <Text style={{ color: colors.primary, fontSize: 16 }}>Go back</Text>
+        <Ionicons name="alert-circle-outline" size={52} color={colors.mutedForeground} />
+        <Text style={[styles.errorTitle, { color: colors.foreground }]}>Resource not found</Text>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backLink, { backgroundColor: colors.muted }]}>
+          <Ionicons name="arrow-back" size={16} color={colors.primary} />
+          <Text style={[styles.backLinkText, { color: colors.primary }]}>Go back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   const typeColor = TYPE_COLORS[resource.type] || TYPE_COLORS.other;
-  const canAfford = (user?.unitsBalance ?? 0) >= resource.downloadCost;
+  const iconName = TYPE_ICONS[resource.type] || TYPE_ICONS.other;
+  const isTrial = user?.isTrialActive;
+  const canAfford = isTrial || (user?.unitsBalance ?? 0) >= resource.downloadCost;
 
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: 110 }]}
     >
-      <View style={[styles.typeStrip, { backgroundColor: typeColor }]} />
-
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={[styles.typeBadge, { backgroundColor: typeColor + "20" }]}>
-          <Text style={[styles.typeText, { color: typeColor }]}>
-            {resource.type?.toUpperCase()}
-          </Text>
+      {/* ── Type hero strip ──────────────────────────────────────────── */}
+      <LinearGradient
+        colors={[typeColor + "30", typeColor + "08"]}
+        style={styles.typeHero}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={[styles.typeIconCircle, { backgroundColor: typeColor + "25" }]}>
+          <Ionicons name={iconName as any} size={32} color={typeColor} />
         </View>
-
+        <View style={[styles.typeBadge, { backgroundColor: typeColor + "25" }]}>
+          <Text style={[styles.typeBadgeText, { color: typeColor }]}>{resource.type?.toUpperCase()}</Text>
+        </View>
         <Text style={[styles.resourceName, { color: colors.foreground }]}>{resource.name}</Text>
 
         {resource.description ? (
-          <Text style={[styles.description, { color: colors.mutedForeground }]}>
-            {resource.description}
-          </Text>
+          <Text style={[styles.description, { color: colors.mutedForeground }]}>{resource.description}</Text>
         ) : null}
 
         <View style={styles.statsRow}>
-          <View style={styles.stat}>
-            <Ionicons name="eye" size={16} color={colors.mutedForeground} />
-            <Text style={[styles.statText, { color: colors.mutedForeground }]}>
-              {resource.viewCount ?? 0} views
-            </Text>
-          </View>
-          <View style={styles.stat}>
-            <Ionicons name="download" size={16} color={colors.mutedForeground} />
-            <Text style={[styles.statText, { color: colors.mutedForeground }]}>
-              {resource.downloadCount ?? 0} downloads
-            </Text>
-          </View>
+          <StatPill icon="eye" label={`${resource.viewCount ?? 0} views`} colors={colors} />
+          <StatPill icon="download" label={`${resource.downloadCount ?? 0} downloads`} colors={colors} />
           {formatBytes(resource.fileSize) ? (
-            <View style={styles.stat}>
-              <Ionicons name="server" size={16} color={colors.mutedForeground} />
-              <Text style={[styles.statText, { color: colors.mutedForeground }]}>
-                {formatBytes(resource.fileSize)}
-              </Text>
-            </View>
+            <StatPill icon="server" label={formatBytes(resource.fileSize)!} colors={colors} />
           ) : null}
         </View>
-      </View>
+      </LinearGradient>
 
-      <View style={[styles.costCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.costRow}>
-          <Text style={[styles.costLabel, { color: colors.mutedForeground }]}>Download Cost</Text>
-          <View style={styles.costAmount}>
-            <Ionicons name="flash" size={20} color={colors.accent} />
-            <Text style={[styles.costValue, { color: colors.accent }]}>
-              {resource.downloadCost}
-            </Text>
-            <Text style={[styles.costUnit, { color: colors.mutedForeground }]}>units</Text>
+      {/* ── Cost / Trial card ────────────────────────────────────────── */}
+      {isTrial ? (
+        <View style={[styles.costCard, { backgroundColor: "#78350F18", borderColor: "#D97706" }]}>
+          <View style={styles.costRow}>
+            <View style={styles.costLeft}>
+              <Ionicons name="gift" size={20} color="#D97706" />
+              <View>
+                <Text style={[styles.costLabel, { color: "#D97706" }]}>Trial Download</Text>
+                <Text style={[styles.costSub, { color: colors.mutedForeground }]}>Free during your trial period</Text>
+              </View>
+            </View>
+            <Text style={[styles.costFree, { color: "#D97706" }]}>FREE</Text>
           </View>
         </View>
-      </View>
+      ) : (
+        <View style={[styles.costCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.costRow}>
+            <View style={styles.costLeft}>
+              <Ionicons name="flash" size={20} color={colors.accent} />
+              <View>
+                <Text style={[styles.costLabel, { color: colors.mutedForeground }]}>Download Cost</Text>
+                <Text style={[styles.costSub, { color: colors.mutedForeground }]}>
+                  Your balance: {user?.unitsBalance ?? 0} units
+                </Text>
+              </View>
+            </View>
+            <View style={styles.costAmount}>
+              <Text style={[styles.costValue, { color: colors.accent }]}>{resource.downloadCost}</Text>
+              <Text style={[styles.costUnit, { color: colors.mutedForeground }]}>units</Text>
+            </View>
+          </View>
+        </View>
+      )}
 
-      <View style={styles.actions}>
+      {/* ── Actions ──────────────────────────────────────────────────── */}
+      <View style={styles.actionsRow}>
         <TouchableOpacity
-          style={[styles.viewButton, { borderColor: colors.primary }]}
+          style={[styles.viewBtn, { borderColor: colors.primary }]}
           onPress={handleView}
-          activeOpacity={0.7}
+          activeOpacity={0.75}
         >
           <Ionicons name="eye" size={20} color={colors.primary} />
-          <Text style={[styles.viewButtonText, { color: colors.primary }]}>View Free</Text>
+          <Text style={[styles.viewBtnText, { color: colors.primary }]}>View Free</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
-            styles.downloadButton,
-            { backgroundColor: canAfford ? colors.primary : colors.muted },
+            styles.downloadBtn,
+            isTrial
+              ? { backgroundColor: "#D97706" }
+              : canAfford
+              ? { backgroundColor: "#142042" }
+              : { backgroundColor: colors.muted },
           ]}
           onPress={handleDownload}
-          disabled={downloading || downloadMutation.isPending}
-          activeOpacity={0.7}
+          disabled={downloadMutation.isPending}
+          activeOpacity={0.8}
         >
           {downloadMutation.isPending ? (
-            <ActivityIndicator size="small" color={colors.primaryForeground} />
+            <ActivityIndicator size="small" color="#fff" />
           ) : (
             <>
               <Ionicons
-                name="download"
+                name={isTrial ? "gift" : "download"}
                 size={20}
-                color={canAfford ? colors.primaryForeground : colors.mutedForeground}
+                color={canAfford ? "#fff" : colors.mutedForeground}
               />
-              <Text
-                style={[
-                  styles.downloadButtonText,
-                  { color: canAfford ? colors.primaryForeground : colors.mutedForeground },
-                ]}
-              >
-                Download
+              <Text style={[styles.downloadBtnText, { color: canAfford ? "#fff" : colors.mutedForeground }]}>
+                {isTrial ? "Download Free" : "Download"}
               </Text>
             </>
           )}
         </TouchableOpacity>
       </View>
 
-      {!canAfford && (
-        <Text style={[styles.insufficientText, { color: colors.destructive }]}>
-          You need {resource.downloadCost - (user?.unitsBalance ?? 0)} more units
-        </Text>
+      {!canAfford && !isTrial && (
+        <View style={[styles.insufficientBox, { backgroundColor: "#EF444415", borderColor: "#EF4444" }]}>
+          <Ionicons name="warning" size={16} color="#EF4444" />
+          <Text style={[styles.insufficientText, { color: "#EF4444" }]}>
+            You need {resource.downloadCost - (user?.unitsBalance ?? 0)} more units. Ask an admin to top up your balance.
+          </Text>
+        </View>
       )}
 
+      {/* ── Security note ─────────────────────────────────────────────── */}
       <View style={[styles.securityNote, { backgroundColor: colors.muted }]}>
         <Ionicons name="shield-checkmark" size={16} color={colors.primary} />
         <Text style={[styles.securityText, { color: colors.mutedForeground }]}>
-          Reading is free and secure. Downloads require units and are watermarked.
+          Reading is always free and secure. Downloads are watermarked for copyright protection.
         </Text>
       </View>
     </ScrollView>
@@ -239,69 +288,67 @@ export default function ResourceDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 20 },
-  centered: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-  errorText: { fontSize: 18, fontFamily: "PlusJakartaSans_600SemiBold" },
-  typeStrip: { height: 4, borderRadius: 2, marginBottom: 16 },
-  card: {
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 20,
-    marginBottom: 16,
+  content: { padding: 16, gap: 14 },
+  centered: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14, padding: 32 },
+  errorTitle: { fontSize: 18, fontFamily: "PlusJakartaSans_600SemiBold" },
+  backLink: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
+  },
+  backLinkText: { fontSize: 15, fontFamily: "PlusJakartaSans_500Medium" },
+  // Type hero
+  typeHero: {
+    borderRadius: 18, padding: 20, gap: 10,
+  },
+  typeIconCircle: {
+    width: 60, height: 60, borderRadius: 18,
+    alignItems: "center", justifyContent: "center",
   },
   typeBadge: {
     alignSelf: "flex-start",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginBottom: 12,
+    paddingHorizontal: 9, paddingVertical: 4, borderRadius: 6,
   },
-  typeText: { fontSize: 11, fontFamily: "PlusJakartaSans_700Bold", letterSpacing: 0.5 },
+  typeBadgeText: { fontSize: 11, fontFamily: "PlusJakartaSans_700Bold", letterSpacing: 0.5 },
   resourceName: { fontSize: 22, fontFamily: "PlusJakartaSans_700Bold", lineHeight: 28 },
-  description: { fontSize: 15, lineHeight: 22, marginTop: 8 },
-  statsRow: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginTop: 16 },
-  stat: { flexDirection: "row", alignItems: "center", gap: 6 },
-  statText: { fontSize: 13 },
-  costCard: {
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 20,
-    marginBottom: 16,
+  description: { fontSize: 14, lineHeight: 21 },
+  statsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  statPill: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20,
   },
-  costRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  costLabel: { fontSize: 14, fontFamily: "PlusJakartaSans_500Medium" },
-  costAmount: { flexDirection: "row", alignItems: "center", gap: 4 },
-  costValue: { fontSize: 28, fontFamily: "PlusJakartaSans_700Bold" },
+  statText: { fontSize: 12 },
+  // Cost card
+  costCard: { borderWidth: 1, borderRadius: 14, padding: 16 },
+  costRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  costLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  costLabel: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold" },
+  costSub: { fontSize: 12, marginTop: 2 },
+  costAmount: { flexDirection: "row", alignItems: "baseline", gap: 4 },
+  costValue: { fontSize: 32, fontFamily: "PlusJakartaSans_700Bold" },
   costUnit: { fontSize: 14 },
-  actions: { flexDirection: "row", gap: 12, marginBottom: 12 },
-  viewButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
+  costFree: { fontSize: 28, fontFamily: "PlusJakartaSans_700Bold" },
+  // Action buttons
+  actionsRow: { flexDirection: "row", gap: 12 },
+  viewBtn: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5,
   },
-  viewButtonText: { fontSize: 16, fontFamily: "PlusJakartaSans_600SemiBold" },
-  downloadButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
+  viewBtnText: { fontSize: 15, fontFamily: "PlusJakartaSans_600SemiBold" },
+  downloadBtn: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, paddingVertical: 14, borderRadius: 14,
   },
-  downloadButtonText: { fontSize: 16, fontFamily: "PlusJakartaSans_600SemiBold" },
-  insufficientText: { fontSize: 13, textAlign: "center", marginBottom: 16 },
+  downloadBtnText: { fontSize: 15, fontFamily: "PlusJakartaSans_600SemiBold" },
+  // Insufficient
+  insufficientBox: {
+    flexDirection: "row", alignItems: "flex-start",
+    gap: 10, padding: 12, borderRadius: 12, borderWidth: 1,
+  },
+  insufficientText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  // Security
   securityNote: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    padding: 14,
-    borderRadius: 12,
+    flexDirection: "row", alignItems: "flex-start",
+    gap: 10, padding: 14, borderRadius: 12,
   },
   securityText: { flex: 1, fontSize: 13, lineHeight: 18 },
 });
