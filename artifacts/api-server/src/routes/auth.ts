@@ -19,6 +19,15 @@ import { authRateLimit, uploadRateLimit } from "../lib/rate-limit";
 const OIDC_COOKIE_TTL = 10 * 60 * 1000;
 const WELCOME_UNITS = 50;
 
+// Short-lived one-time exchange tokens for mobile auth (bypasses ASWebAuthenticationSession cookie isolation)
+const mobileExchangeTokens = new Map<string, { sessionId: string; expiresAt: number }>();
+setInterval(() => {
+  const now = Date.now();
+  for (const [tok, data] of mobileExchangeTokens) {
+    if (data.expiresAt < now) mobileExchangeTokens.delete(tok);
+  }
+}, 60_000);
+
 const router: IRouter = Router();
 
 function getOrigin(req: Request): string {
@@ -356,13 +365,41 @@ router.get("/callback", async (req: Request, res: Response) => {
   const sid = await createSession(sessionData);
   setSessionCookie(res, sid);
 
-  // If this was a mobile login, redirect to the deep link so Expo closes the browser
+  // If this was a mobile login, embed a one-time exchange token in the deep link.
+  // The app uses this token to call /api/auth/exchange via a regular fetch, which sets
+  // the session cookie through iOS's normal HTTP stack (not ASWebAuthenticationSession's
+  // isolated cookie jar — those two stores do NOT share cookies).
   if (mobileReturnTo) {
-    res.redirect(mobileReturnTo);
+    const exchangeToken = oidc.randomState();
+    mobileExchangeTokens.set(exchangeToken, { sessionId: sid, expiresAt: Date.now() + 2 * 60 * 1000 });
+    const deepLink = `${mobileReturnTo}${mobileReturnTo.includes("?") ? "&" : "?"}token=${exchangeToken}`;
+    res.redirect(deepLink);
     return;
   }
 
   res.redirect(returnTo);
+});
+
+// Called by the mobile app after openAuthSessionAsync returns — trades the one-time exchange
+// token for a real session cookie via a normal fetch (bypassing the ASWebAuthenticationSession
+// cookie-jar isolation issue on iOS).
+router.get("/auth/exchange", async (req: Request, res: Response) => {
+  const token = typeof req.query.token === "string" ? req.query.token : null;
+  if (!token) {
+    res.status(400).json({ error: "Missing token" });
+    return;
+  }
+
+  const record = mobileExchangeTokens.get(token);
+  if (!record || record.expiresAt < Date.now()) {
+    mobileExchangeTokens.delete(token);
+    res.status(401).json({ error: "Invalid or expired token" });
+    return;
+  }
+
+  mobileExchangeTokens.delete(token); // one-time use
+  setSessionCookie(res, record.sessionId);
+  res.json({ success: true });
 });
 
 router.post("/auth/profile-photo", uploadRateLimit, async (req: Request, res: Response) => {
