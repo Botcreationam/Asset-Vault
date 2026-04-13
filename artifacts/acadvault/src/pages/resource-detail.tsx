@@ -29,6 +29,7 @@ import {
   BookOpen,
   Loader2,
   ShieldCheck,
+  Gift,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -99,7 +100,9 @@ export default function ResourceDetail() {
 
           toast({
             title: "Download started",
-            description: `${data.unitsSpent} units used · ${data.newBalance} remaining`,
+            description: (data as any).trialDownload
+              ? "Free trial download — no units used!"
+              : `${data.unitsSpent} units used · ${data.newBalance} remaining`,
           });
         } catch {
           window.open(data.url, "_blank");
@@ -121,7 +124,8 @@ export default function ResourceDetail() {
 
   const handleDownloadClick = () => {
     if (!resource) return;
-    if ((user?.unitsBalance || 0) < resource.downloadCost) {
+    // Trial users always get free downloads
+    if (!user?.isTrialActive && (user?.unitsBalance || 0) < resource.downloadCost) {
       toast({
         title: "Not enough units",
         description: `You need ${resource.downloadCost} units but have ${user?.unitsBalance}. Top up in your Account.`,
@@ -158,7 +162,8 @@ export default function ResourceDetail() {
     );
   }
 
-  const canAfford = (user?.unitsBalance || 0) >= resource.downloadCost;
+  const isTrial = user?.isTrialActive ?? false;
+  const canAfford = isTrial || (user?.unitsBalance || 0) >= resource.downloadCost;
   const remaining = (user?.unitsBalance || 0) - resource.downloadCost;
 
   return (
@@ -234,25 +239,42 @@ export default function ResourceDetail() {
 
             {/* Cost + download */}
             <div className="shrink-0 flex flex-col gap-3 w-full lg:w-56">
-              <div className="rounded-xl border border-border bg-background p-4 text-center">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                  Download Cost
-                </p>
-                <div className="flex items-center justify-center gap-1.5 text-3xl font-bold">
-                  <Zap className="w-6 h-6 text-accent" />
-                  <span>{resource.downloadCost}</span>
+              {isTrial ? (
+                <div className="rounded-xl border border-amber-300/60 bg-amber-50 dark:bg-amber-900/20 p-4 text-center">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-1">
+                    Trial Download
+                  </p>
+                  <div className="flex items-center justify-center gap-1.5 text-3xl font-bold text-amber-600 dark:text-amber-400">
+                    <Gift className="w-6 h-6" />
+                    <span>Free</span>
+                  </div>
+                  <p className="text-xs text-amber-600/80 dark:text-amber-400/70 mt-0.5">
+                    {user?.trialDaysRemaining}d left in trial
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">units</p>
-              </div>
+              ) : (
+                <div className="rounded-xl border border-border bg-background p-4 text-center">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                    Download Cost
+                  </p>
+                  <div className="flex items-center justify-center gap-1.5 text-3xl font-bold">
+                    <Zap className="w-6 h-6 text-accent" />
+                    <span>{resource.downloadCost}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">units</p>
+                </div>
+              )}
 
               <Button
                 size="lg"
-                className="w-full font-bold gap-2 shadow-md hover:shadow-lg transition-shadow"
+                className={`w-full font-bold gap-2 shadow-md hover:shadow-lg transition-shadow ${isTrial ? "bg-amber-500 hover:bg-amber-600 text-white border-0" : ""}`}
                 onClick={handleDownloadClick}
                 disabled={isDownloading || downloadMutation.isPending}
               >
                 {isDownloading || downloadMutation.isPending ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /> Preparing…</>
+                ) : isTrial ? (
+                  <><Gift className="w-4 h-4" /> Download Free</>
                 ) : (
                   <><Download className="w-4 h-4" /> Download</>
                 )}

@@ -27,6 +27,9 @@ import {
   BookOpen,
   MapPin,
   Sparkles,
+  Gift,
+  Clock,
+  AlertTriangle,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -282,6 +285,35 @@ export default function Account() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Trial Status Card */}
+        {user?.trialEndsAt && (
+          <Card className={`border ${user.isTrialActive ? "border-amber-300/60 bg-amber-50 dark:bg-amber-900/20" : "border-destructive/30 bg-destructive/5"} shadow-sm`}>
+            <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className={`p-3 rounded-xl ${user.isTrialActive ? "bg-amber-100 dark:bg-amber-800/40" : "bg-destructive/10"}`}>
+                {user.isTrialActive ? (
+                  <Gift className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                ) : (
+                  <AlertTriangle className="w-6 h-6 text-destructive" />
+                )}
+              </div>
+              <div className="flex-1">
+                <p className={`font-semibold text-base ${user.isTrialActive ? "text-amber-800 dark:text-amber-300" : "text-destructive"}`}>
+                  {user.isTrialActive ? "🎓 Free Trial Active" : "Trial Expired"}
+                </p>
+                <p className={`text-sm mt-0.5 ${user.isTrialActive ? "text-amber-700/80 dark:text-amber-400/80" : "text-muted-foreground"}`}>
+                  {user.isTrialActive
+                    ? `You have ${user.trialDaysRemaining} day${user.trialDaysRemaining !== 1 ? "s" : ""} remaining. All downloads are free during your trial.`
+                    : "Your 30-day free trial has ended. Use your units balance to download resources."}
+                </p>
+              </div>
+              <div className={`flex items-center gap-1.5 text-xs font-medium shrink-0 ${user.isTrialActive ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                <Clock className="w-3.5 h-3.5" />
+                <span>{user.isTrialActive ? "Ends" : "Ended"} {new Date(user.trialEndsAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Academic Profile */}
         <AcademicProfile />

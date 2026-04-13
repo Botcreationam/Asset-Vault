@@ -21,6 +21,9 @@ import {
   CheckCheck,
   Shield,
   Bookmark,
+  Clock,
+  AlertTriangle,
+  Gift,
 } from "lucide-react";
 
 import { 
@@ -356,6 +359,32 @@ export function AppLayout({ children }: AppLayoutProps) {
               )}
             </div>
           </header>
+
+          {/* Trial banner */}
+          {isAuthenticated && user?.isTrialActive && (
+            <div className="flex items-center justify-between gap-3 px-4 md:px-6 py-2.5 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-700/40 text-amber-800 dark:text-amber-300 text-sm">
+              <div className="flex items-center gap-2">
+                <Gift className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span className="font-medium">
+                  🎓 Free trial active —{" "}
+                  <span className="font-bold">{user.trialDaysRemaining} day{user.trialDaysRemaining !== 1 ? "s" : ""} remaining.</span>{" "}
+                  Enjoy unlimited free downloads!
+                </span>
+              </div>
+              <div className="flex items-center gap-1 shrink-0 text-xs text-amber-600 dark:text-amber-400">
+                <Clock className="w-3.5 h-3.5" />
+                <span>Ends {new Date(user.trialEndsAt).toLocaleDateString()}</span>
+              </div>
+            </div>
+          )}
+
+          {isAuthenticated && !user?.isTrialActive && user?.trialEndsAt && (
+            <div className="flex items-center gap-3 px-4 md:px-6 py-2.5 bg-destructive/5 border-b border-destructive/20 text-destructive text-sm">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span className="font-medium">Your 30-day free trial has ended. Use your units or contact an admin to continue downloading.</span>
+              <Link href="/account" className="ml-auto shrink-0 underline underline-offset-2 font-semibold text-xs">View Account →</Link>
+            </div>
+          )}
 
           <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
             <div className="mx-auto max-w-7xl w-full">
