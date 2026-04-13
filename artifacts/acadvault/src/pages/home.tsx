@@ -76,9 +76,14 @@ export default function Home() {
                 </Link>
               </Button>
               {!isAuthenticated && (
-                <Button size="lg" variant="outline" onClick={login} className="border-white/30 text-white hover:bg-white/10 font-semibold px-8 h-12 backdrop-blur-sm">
-                  Log in to get started
-                </Button>
+                <div className="flex flex-wrap gap-4">
+                  <Button size="lg" variant="outline" onClick={login} className="border-white/30 text-white hover:bg-white/10 font-semibold px-8 h-12 backdrop-blur-sm">
+                    Log in
+                  </Button>
+                  <Button size="lg" onClick={login} className="bg-[var(--color-accent)] text-[var(--color-bg-dark)] hover:bg-[var(--color-accent)]/90 font-bold px-8 h-12 shadow-lg">
+                    Sign up
+                  </Button>
+                </div>
               )}
             </div>
           </motion.div>
@@ -158,7 +163,7 @@ export default function Home() {
             Join thousands of students accessing premium academic resources today.
           </p>
           <Button size="lg" onClick={login} className="font-bold px-10 h-14 rounded-xl text-lg shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all">
-            Create an Account or Log In
+            Sign up or log in
           </Button>
         </section>
       )}
