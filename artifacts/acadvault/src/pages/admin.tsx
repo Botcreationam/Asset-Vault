@@ -30,6 +30,14 @@ import {
   CheckCircle2,
   XCircle,
   ChevronRight,
+  BarChart3,
+  Download,
+  Eye,
+  Star,
+  PackageSearch,
+  TrendingUp,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -142,8 +150,11 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        <Tabs defaultValue="resources" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 max-w-2xl mb-8 h-12">
+        <Tabs defaultValue="analytics" className="w-full">
+          <TabsList className="grid w-full grid-cols-6 max-w-3xl mb-8 h-12">
+            <TabsTrigger value="analytics" className="text-sm h-10">
+              Analytics
+            </TabsTrigger>
             <TabsTrigger value="resources" className="text-sm h-10">
               Upload
             </TabsTrigger>
@@ -160,6 +171,10 @@ export default function AdminDashboard() {
               Audit Log
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="analytics">
+            <AnalyticsTab />
+          </TabsContent>
 
           <TabsContent value="resources" className="space-y-6">
             <ResourceUploadTab folders={allFoldersForUpload.length > 0 ? allFoldersForUpload : (foldersData?.folders || [])} />
@@ -1065,6 +1080,201 @@ function GrantUnitsDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ── Analytics Tab ─────────────────────────────────────────────────────────────
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  sub,
+  color = "text-primary",
+}: {
+  label: string;
+  value: string | number;
+  icon: any;
+  sub?: string;
+  color?: string;
+}) {
+  return (
+    <Card className="border-border/60 shadow-sm">
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <div className={`p-2 rounded-lg bg-muted/50 ${color}`}>
+            <Icon className="w-4 h-4" />
+          </div>
+        </div>
+        <p className="text-3xl font-bold text-foreground">{value}</p>
+        {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AnalyticsTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchAnalytics = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}api/admin/analytics`, { credentials: "include" });
+      const d = await res.json();
+      setData(d);
+    } catch {
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const overview = data?.overview || {};
+  const topResources = data?.topResources || [];
+  const resourcesByType = data?.resourcesByType || [];
+  const recentUsers = data?.recentUsers || [];
+
+  const TYPE_COLORS_BAR: Record<string, string> = {
+    pdf: "bg-rose-500",
+    slides: "bg-orange-500",
+    notes: "bg-green-500",
+    book: "bg-blue-500",
+    video: "bg-purple-500",
+    other: "bg-gray-400",
+  };
+
+  const maxDownloads = topResources[0]?.downloadCount || 1;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-primary" /> Platform Analytics
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Live overview of platform activity</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={fetchAnalytics} className="gap-2">
+          <RefreshCw className="w-3.5 h-3.5" /> Refresh
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+        <StatCard label="Total Users" value={overview.totalUsers ?? 0} icon={Users} color="text-blue-500" />
+        <StatCard label="Resources" value={overview.totalResources ?? 0} icon={FileText} color="text-green-500" />
+        <StatCard label="Total Downloads" value={overview.totalDownloads ?? 0} icon={Download} color="text-orange-500" />
+        <StatCard label="Total Views" value={overview.totalViews ?? 0} icon={Eye} color="text-purple-500" />
+        <StatCard label="Units Circulating" value={overview.unitsCirculating ?? 0} icon={Zap} color="text-yellow-500" sub="across all wallets" />
+        <StatCard label="Units Granted" value={overview.unitsGranted ?? 0} icon={TrendingUp} color="text-emerald-500" sub="all time" />
+        <StatCard
+          label="Avg Rating"
+          value={overview.avgRating ? `${Number(overview.avgRating).toFixed(1)} ★` : "N/A"}
+          icon={Star}
+          color="text-yellow-400"
+          sub={`${overview.totalRatings ?? 0} reviews`}
+        />
+        <StatCard label="Pending Requests" value={overview.pendingRequests ?? 0} icon={PackageSearch} color="text-rose-500" sub="material requests" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Download className="w-4 h-4 text-primary" /> Top Downloaded Resources
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {topResources.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No downloads yet</p>
+            ) : (
+              topResources.map((r: any, i: number) => (
+                <div key={r.id} className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-muted-foreground w-5 shrink-0">#{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{r.name}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{ width: `${(r.downloadCount / maxDownloads) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted-foreground shrink-0">{r.downloadCount} dl</span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <Card className="border-border/60 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="w-4 h-4 text-primary" /> Resources by Type
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {resourcesByType.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No resources yet</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {resourcesByType.map((t: any) => (
+                    <div
+                      key={t.type}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 border border-border"
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full ${TYPE_COLORS_BAR[t.type] || "bg-gray-400"}`} />
+                      <span className="text-sm font-medium capitalize">{t.type}</span>
+                      <span className="text-sm font-bold text-muted-foreground">{t.count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Users className="w-4 h-4 text-primary" /> Recently Joined
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {recentUsers.map((u: any) => (
+                <div key={u.id} className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {u.firstName ? `${u.firstName} ${u.lastName}` : u.username || "User"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(u.createdAt), "MMM d, yyyy")}
+                    </p>
+                  </div>
+                  <Badge variant={u.role === "admin" ? "default" : "secondary"} className="text-[10px] shrink-0">
+                    {u.role}
+                  </Badge>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
   );
 }
 

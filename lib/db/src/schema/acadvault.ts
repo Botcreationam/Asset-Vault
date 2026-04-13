@@ -185,3 +185,79 @@ export const messagesTable = pgTable("messages", {
   content: text("content").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// ── Resource Ratings ──────────────────────────────────────────────────────────
+export const resourceRatingsTable = pgTable(
+  "resource_ratings",
+  {
+    id: serial("id").primaryKey(),
+    resourceId: text("resource_id").notNull(),
+    userId: text("user_id").notNull(),
+    rating: integer("rating").notNull(),
+    review: text("review"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("resource_ratings_resource_user_idx").on(table.resourceId, table.userId)],
+);
+
+export const insertResourceRatingSchema = createInsertSchema(resourceRatingsTable).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertResourceRating = z.infer<typeof insertResourceRatingSchema>;
+export type ResourceRating = typeof resourceRatingsTable.$inferSelect;
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "resource_approved",
+  "units_received",
+  "request_fulfilled",
+  "system",
+  "new_resource",
+]);
+
+export const notificationsTable = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  type: notificationTypeEnum("type").notNull().default("system"),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  isRead: boolean("is_read").notNull().default(false),
+  relatedId: text("related_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type Notification = typeof notificationsTable.$inferSelect;
+
+// ── Material Requests ─────────────────────────────────────────────────────────
+export const materialRequestStatusEnum = pgEnum("material_request_status", [
+  "pending",
+  "in_progress",
+  "fulfilled",
+  "rejected",
+]);
+
+export const materialRequestsTable = pgTable("material_requests", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  subject: text("subject"),
+  courseCode: text("course_code"),
+  status: materialRequestStatusEnum("status").notNull().default("pending"),
+  adminNote: text("admin_note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertMaterialRequestSchema = createInsertSchema(materialRequestsTable).omit({
+  id: true,
+  status: true,
+  adminNote: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertMaterialRequest = z.infer<typeof insertMaterialRequestSchema>;
+export type MaterialRequest = typeof materialRequestsTable.$inferSelect;

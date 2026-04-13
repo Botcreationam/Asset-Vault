@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { createNotification } from "./notifications";
 import { db } from "@workspace/db";
 import {
   userUnitsTable,
@@ -272,6 +273,13 @@ router.post("/admin/users/:userId/units", async (req, res) => {
     await logAudit("grant_units", req.user.id, params.data.userId, {
       amount,
       description,
+    });
+
+    await createNotification({
+      userId: params.data.userId,
+      type: "units_received",
+      title: `You received ${amount} units!`,
+      body: description ?? `An admin has added ${amount} units to your account.`,
     });
 
     res.json({ balance: updated?.balance ?? 0 });
