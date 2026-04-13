@@ -12,6 +12,7 @@ export interface AuthUser {
   username?: string;
   firstName?: string;
   lastName?: string;
+  email?: string | null;
   profileImageUrl?: string;
   role: AuthUserRole;
   unitsBalance: number;
@@ -23,4 +24,8 @@ export interface AuthUser {
   isTrialActive: boolean;
   trialDaysRemaining: number;
   trialEndsAt: string;
+  schoolId?: string | null;
+  institutionalEmail?: string | null;
+  approvalStatus?: "pending" | "approved" | "rejected";
+  rejectionReason?: string | null;
 }

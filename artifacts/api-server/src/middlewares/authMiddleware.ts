@@ -95,6 +95,11 @@ export async function authMiddleware(
       semester: usersTable.semester,
       onboardingCompleted: usersTable.onboardingCompleted,
       createdAt: usersTable.createdAt,
+      email: usersTable.email,
+      schoolId: usersTable.schoolId,
+      institutionalEmail: usersTable.institutionalEmail,
+      approvalStatus: usersTable.approvalStatus,
+      rejectionReason: usersTable.rejectionReason,
     })
     .from(usersTable)
     .where(eq(usersTable.id, refreshed.user.id));
@@ -114,6 +119,11 @@ export async function authMiddleware(
     isTrialActive: trial.isActive,
     trialDaysRemaining: trial.daysRemaining,
     trialEndsAt: trial.endsAt.toISOString(),
+    email: dbUser?.email ?? null,
+    schoolId: dbUser?.schoolId ?? null,
+    institutionalEmail: dbUser?.institutionalEmail ?? null,
+    approvalStatus: (dbUser?.approvalStatus ?? "approved") as "pending" | "approved" | "rejected",
+    rejectionReason: dbUser?.rejectionReason ?? null,
   };
   next();
 }
