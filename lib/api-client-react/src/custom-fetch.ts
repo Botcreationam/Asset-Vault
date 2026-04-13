@@ -41,19 +41,6 @@ export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
 }
 
-/**
- * Retrieve the current auth token using the registered getter.
- * Returns null if no getter is registered or the getter returns null.
- */
-export async function getAuthToken(): Promise<string | null> {
-  if (!_authTokenGetter) return null;
-  try {
-    return (await _authTokenGetter()) ?? null;
-  } catch {
-    return null;
-  }
-}
-
 function isRequest(input: RequestInfo | URL): input is Request {
   return typeof Request !== "undefined" && input instanceof Request;
 }

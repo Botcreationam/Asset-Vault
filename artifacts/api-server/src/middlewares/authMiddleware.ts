@@ -2,7 +2,6 @@ import * as oidc from "openid-client";
 import { type Request, type Response, type NextFunction } from "express";
 import type { AuthUser } from "@workspace/api-zod";
 import { db, usersTable } from "@workspace/db";
-import { userUnitsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import {
   clearSession,
@@ -85,24 +84,16 @@ export async function authMiddleware(
     return;
   }
 
-  const userId = refreshed.user.id;
-
-  const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
-  if (!dbUser) {
-    await clearSession(res, sid);
-    next();
-    return;
-  }
-
-  const [unitsRow] = await db
-    .select({ balance: userUnitsTable.balance })
-    .from(userUnitsTable)
-    .where(eq(userUnitsTable.userId, userId));
+  const [dbUser] = await db
+    .select({ role: usersTable.role, username: usersTable.username })
+    .from(usersTable)
+    .where(eq(usersTable.id, refreshed.user.id));
 
   req.user = {
     ...refreshed.user,
-    role: (dbUser.role ?? "student") as "student" | "moderator" | "admin",
-    unitsBalance: unitsRow?.balance ?? 0,
+    role: (dbUser?.role ?? "student") as "student" | "moderator" | "admin",
+    username: dbUser?.username ?? undefined,
+    unitsBalance: 0,
   };
   next();
 }

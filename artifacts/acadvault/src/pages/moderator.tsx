@@ -63,7 +63,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
-import { BASE_URL, authFetch } from "@/lib/api";
+const BASE_URL = import.meta.env.BASE_URL;
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
@@ -131,14 +131,14 @@ function MaterialRequestsTab() {
   const { data, isLoading } = useQuery<any>({
     queryKey: ["/api/material-requests"],
     queryFn: async () => {
-      const res = await authFetch(`${BASE_URL}api/material-requests`, { credentials: "include" });
+      const res = await fetch(`${BASE_URL}api/material-requests`, { credentials: "include" });
       return res.json();
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, status, note }: { id: string; status: string; note: string }) => {
-      const res = await authFetch(`${BASE_URL}api/material-requests/${id}`, {
+      const res = await fetch(`${BASE_URL}api/material-requests/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -266,7 +266,7 @@ function PostsModerationTab() {
   const { data, isLoading } = useQuery<any>({
     queryKey: ["/api/social/posts"],
     queryFn: async () => {
-      const res = await authFetch(`${BASE_URL}api/social/posts?limit=50`, { credentials: "include" });
+      const res = await fetch(`${BASE_URL}api/social/posts?limit=50`, { credentials: "include" });
       return res.json();
     },
   });
@@ -275,14 +275,14 @@ function PostsModerationTab() {
     queryKey: ["/api/social/posts", expandedPost, "comments"],
     enabled: !!expandedPost,
     queryFn: async () => {
-      const res = await authFetch(`${BASE_URL}api/social/posts/${expandedPost}/comments`, { credentials: "include" });
+      const res = await fetch(`${BASE_URL}api/social/posts/${expandedPost}/comments`, { credentials: "include" });
       return res.json();
     },
   });
 
   const deletePostMutation = useMutation({
     mutationFn: async (postId: number) => {
-      const res = await authFetch(`${BASE_URL}api/social/posts/${postId}`, { method: "DELETE", credentials: "include" });
+      const res = await fetch(`${BASE_URL}api/social/posts/${postId}`, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed");
     },
     onSuccess: () => {
@@ -295,7 +295,7 @@ function PostsModerationTab() {
 
   const deleteCommentMutation = useMutation({
     mutationFn: async ({ postId, commentId }: { postId: number; commentId: number }) => {
-      const res = await authFetch(`${BASE_URL}api/social/posts/${postId}/comments/${commentId}`, { method: "DELETE", credentials: "include" });
+      const res = await fetch(`${BASE_URL}api/social/posts/${postId}/comments/${commentId}`, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed");
     },
     onSuccess: () => {
@@ -427,14 +427,14 @@ function FoldersTab() {
   const { data, isLoading } = useQuery<any>({
     queryKey: ["/api/folders/all"],
     queryFn: async () => {
-      const res = await authFetch(`${BASE_URL}api/folders/all`, { credentials: "include" });
+      const res = await fetch(`${BASE_URL}api/folders/all`, { credentials: "include" });
       return res.json();
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (name: string) => {
-      const res = await authFetch(`${BASE_URL}api/folders`, {
+      const res = await fetch(`${BASE_URL}api/folders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -454,7 +454,7 @@ function FoldersTab() {
 
   const renameMutation = useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const res = await authFetch(`${BASE_URL}api/folders/${id}`, {
+      const res = await fetch(`${BASE_URL}api/folders/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -473,7 +473,7 @@ function FoldersTab() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await authFetch(`${BASE_URL}api/folders/${id}`, { method: "DELETE", credentials: "include" });
+      const res = await fetch(`${BASE_URL}api/folders/${id}`, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed");
     },
     onSuccess: () => {
