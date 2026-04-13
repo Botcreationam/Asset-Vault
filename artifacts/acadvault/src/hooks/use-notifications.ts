@@ -1,5 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { BASE_URL } from "@/lib/api";
+import { getAuthToken } from "@workspace/api-client-react";
+
+async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = await getAuthToken();
+  const headers = new Headers(options.headers);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return fetch(url, { ...options, credentials: "include", headers });
+}
 
 export interface AppNotification {
   id: number;
@@ -19,9 +27,7 @@ export function useNotifications(isAuthenticated: boolean) {
   const fetchNotifications = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
-      const res = await fetch(`${BASE_URL}api/notifications`, {
-        credentials: "include",
-      });
+      const res = await authFetch(`${BASE_URL}api/notifications`);
       if (!res.ok) return;
       const data = await res.json();
       setNotifications(data.notifications || []);
@@ -37,10 +43,7 @@ export function useNotifications(isAuthenticated: boolean) {
 
   const markAllRead = useCallback(async () => {
     try {
-      await fetch(`${BASE_URL}api/notifications/read-all`, {
-        method: "PATCH",
-        credentials: "include",
-      });
+      await authFetch(`${BASE_URL}api/notifications/read-all`, { method: "PATCH" });
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
     } catch {}
@@ -48,10 +51,7 @@ export function useNotifications(isAuthenticated: boolean) {
 
   const markRead = useCallback(async (id: number) => {
     try {
-      await fetch(`${BASE_URL}api/notifications/${id}/read`, {
-        method: "PATCH",
-        credentials: "include",
-      });
+      await authFetch(`${BASE_URL}api/notifications/${id}/read`, { method: "PATCH" });
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
       );

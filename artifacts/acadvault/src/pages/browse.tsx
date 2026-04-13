@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { AuthWrapper } from "@/components/auth-wrapper";
 import { formatDistanceToNow } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
-import { BASE_URL } from "@/lib/api";
+import { BASE_URL, authFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import {
   Folder as FolderIcon,
@@ -160,7 +160,7 @@ export default function Browse() {
       return;
     }
     try {
-      const res = await fetch(`${BASE_URL}api/folders/${editingFolder.id}`, {
+      const res = await authFetch(`${BASE_URL}api/folders/${editingFolder.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -179,7 +179,7 @@ export default function Browse() {
   const handleEditResource = async () => {
     if (!editingResource || !editResName.trim()) return;
     try {
-      const res = await fetch(`${BASE_URL}api/resources/${editingResource.id}`, {
+      const res = await authFetch(`${BASE_URL}api/resources/${editingResource.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

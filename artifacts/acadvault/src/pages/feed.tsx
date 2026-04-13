@@ -5,7 +5,7 @@ import { AuthWrapper } from "@/components/auth-wrapper";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { formatDistanceToNow } from "date-fns";
-import { BASE_URL } from "@/lib/api";
+import { BASE_URL, authFetch } from "@/lib/api";
 import {
   Heart,
   MessageCircle,
@@ -211,7 +211,7 @@ export default function Feed() {
   const fetchPosts = async (cursor?: number) => {
     const params = new URLSearchParams({ limit: "20" });
     if (cursor) params.set("cursor", String(cursor));
-    const res = await fetch(`${BASE_URL}api/social/posts?${params}`, { credentials: "include" });
+    const res = await authFetch(`${BASE_URL}api/social/posts?${params}`, { credentials: "include" });
     if (!res.ok) throw new Error("Failed to load posts");
     return res.json();
   };

@@ -34,7 +34,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { BASE_URL } from "@/lib/api";
+import { BASE_URL, authFetch } from "@/lib/api";
 
 export default function Account() {
   const { user } = useAuth();
@@ -66,7 +66,7 @@ export default function Account() {
   const saveProfile = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`${BASE_URL}api/auth/profile`, {
+      const res = await authFetch(`${BASE_URL}api/auth/profile`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -134,7 +134,7 @@ export default function Account() {
                       try {
                         const formData = new FormData();
                         formData.append("photo", file);
-                        const res = await fetch(`${BASE_URL}api/auth/profile-photo`, {
+                        const res = await authFetch(`${BASE_URL}api/auth/profile-photo`, {
                           method: "POST",
                           credentials: "include",
                           body: formData,
