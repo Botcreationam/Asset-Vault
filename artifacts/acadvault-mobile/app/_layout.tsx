@@ -77,6 +77,18 @@ function RootLayoutNav() {
             headerTitleStyle: { fontFamily: "PlusJakartaSans_600SemiBold" },
           }}
         />
+        <Stack.Screen
+          name="chat/[id]"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="material-requests"
+          options={{
+            headerShown: false,
+          }}
+        />
       </Stack>
     </>
   );

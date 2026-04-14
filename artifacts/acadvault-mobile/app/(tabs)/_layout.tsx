@@ -24,6 +24,14 @@ function NativeTabLayout() {
         <Icon sf={{ default: "newspaper", selected: "newspaper.fill" }} />
         <Label>Feed</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="chat">
+        <Icon sf={{ default: "bubble.left.and.bubble.right", selected: "bubble.left.and.bubble.right.fill" }} />
+        <Label>Chat</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="bookmarks">
+        <Icon sf={{ default: "bookmark", selected: "bookmark.fill" }} />
+        <Label>Saved</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="account">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
         <Label>Account</Label>
@@ -55,7 +63,7 @@ function ClassicTabLayout() {
         },
         tabBarLabelStyle: {
           fontFamily: "PlusJakartaSans_500Medium",
-          fontSize: 11,
+          fontSize: 10,
         },
         tabBarBackground: () =>
           isIOS ? (
@@ -80,7 +88,7 @@ function ClassicTabLayout() {
           title: "Library",
           tabBarIcon: ({ color, size }) =>
             isIOS ? (
-              <SymbolView name="books.vertical" tintColor={color} size={size ?? 24} />
+              <SymbolView name="books.vertical" tintColor={color} size={size ?? 22} />
             ) : (
               <Ionicons name="library" size={size ?? 22} color={color} />
             ),
@@ -92,7 +100,7 @@ function ClassicTabLayout() {
           title: "Search",
           tabBarIcon: ({ color, size }) =>
             isIOS ? (
-              <SymbolView name="magnifyingglass" tintColor={color} size={size ?? 24} />
+              <SymbolView name="magnifyingglass" tintColor={color} size={size ?? 22} />
             ) : (
               <Ionicons name="search" size={size ?? 22} color={color} />
             ),
@@ -104,9 +112,33 @@ function ClassicTabLayout() {
           title: "Feed",
           tabBarIcon: ({ color, size }) =>
             isIOS ? (
-              <SymbolView name="newspaper" tintColor={color} size={size ?? 24} />
+              <SymbolView name="newspaper" tintColor={color} size={size ?? 22} />
             ) : (
               <Ionicons name="newspaper" size={size ?? 22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: "Chat",
+          tabBarIcon: ({ color, size }) =>
+            isIOS ? (
+              <SymbolView name="bubble.left.and.bubble.right" tintColor={color} size={size ?? 22} />
+            ) : (
+              <Ionicons name="chatbubbles" size={size ?? 22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="bookmarks"
+        options={{
+          title: "Saved",
+          tabBarIcon: ({ color, size }) =>
+            isIOS ? (
+              <SymbolView name="bookmark" tintColor={color} size={size ?? 22} />
+            ) : (
+              <Ionicons name="bookmark" size={size ?? 22} color={color} />
             ),
         }}
       />
@@ -116,7 +148,7 @@ function ClassicTabLayout() {
           title: "Account",
           tabBarIcon: ({ color, size }) =>
             isIOS ? (
-              <SymbolView name="person" tintColor={color} size={size ?? 24} />
+              <SymbolView name="person" tintColor={color} size={size ?? 22} />
             ) : (
               <Ionicons name="person" size={size ?? 22} color={color} />
             ),
