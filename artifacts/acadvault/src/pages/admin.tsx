@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Component, type ReactNode, type ErrorInfo } from "react";
 import { AuthWrapper } from "@/components/auth-wrapper";
 import {
   useListFolders,
@@ -50,6 +50,7 @@ import {
 import { format } from "date-fns";
 
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -79,6 +80,40 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { BASE_URL } from "@/lib/api";
+
+// ── Error Boundary — prevents a single tab crash from killing the whole page ──
+class TabErrorBoundary extends Component<
+  { children: ReactNode; label?: string },
+  { error: Error | null }
+> {
+  constructor(props: { children: ReactNode; label?: string }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[AdminPanel] tab error:", error, info);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+          <AlertTriangle className="w-10 h-10 text-red-400" />
+          <div>
+            <p className="font-semibold text-foreground">Something went wrong in {this.props.label || "this tab"}</p>
+            <p className="text-sm text-muted-foreground mt-1">{this.state.error.message}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => this.setState({ error: null })}>
+            Try again
+          </Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const folderSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -174,27 +209,31 @@ export default function AdminDashboard() {
           </TabsList>
 
           <TabsContent value="analytics">
-            <AnalyticsTab />
+            <TabErrorBoundary label="Analytics"><AnalyticsTab /></TabErrorBoundary>
           </TabsContent>
 
           <TabsContent value="approvals">
-            <ApprovalsTab />
+            <TabErrorBoundary label="Approvals"><ApprovalsTab /></TabErrorBoundary>
           </TabsContent>
 
           <TabsContent value="resources" className="space-y-6">
-            <ResourceUploadTab folders={allFoldersForUpload.length > 0 ? allFoldersForUpload : (foldersData?.folders || [])} />
+            <TabErrorBoundary label="Upload">
+              <ResourceUploadTab folders={allFoldersForUpload.length > 0 ? allFoldersForUpload : (foldersData?.folders || [])} />
+            </TabErrorBoundary>
           </TabsContent>
 
           <TabsContent value="files">
-            <FilesTab />
+            <TabErrorBoundary label="Files"><FilesTab /></TabErrorBoundary>
           </TabsContent>
 
           <TabsContent value="folders">
-            <FoldersTab folders={foldersData?.folders || []} refetch={refetchFolders} />
+            <TabErrorBoundary label="Folders">
+              <FoldersTab folders={foldersData?.folders || []} refetch={refetchFolders} />
+            </TabErrorBoundary>
           </TabsContent>
 
           <TabsContent value="schools">
-            <SchoolsTab />
+            <TabErrorBoundary label="Schools"><SchoolsTab /></TabErrorBoundary>
           </TabsContent>
 
           <TabsContent value="users">
@@ -1411,6 +1450,7 @@ type PendingUser = {
   academicYear: string | null;
   semester: string | null;
   schoolId: string | null;
+  schoolName: string | null;
   institutionalEmail: string | null;
   studentIdImageUrl: string | null;
   approvalStatus: string;
@@ -1538,9 +1578,9 @@ function ApprovalsTab() {
                             <Mail className="w-3 h-3" /> {u.institutionalEmail} (institutional)
                           </span>
                         )}
-                        {u.schoolId && (
+                        {(u.schoolName || u.schoolId) && (
                           <span className="flex items-center gap-1">
-                            <Building2 className="w-3 h-3" /> {u.schoolId}
+                            <Building2 className="w-3 h-3" /> {u.schoolName || u.schoolId}
                           </span>
                         )}
                         {u.program && (
