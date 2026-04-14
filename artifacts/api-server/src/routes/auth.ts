@@ -2,7 +2,7 @@ import * as oidc from "openid-client";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable } from "@workspace/db";
 import { userUnitsTable, unitsTransactionsTable, auditLogsTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import {
   clearSession,
   getOidcConfig,
@@ -129,12 +129,16 @@ async function upsertUser(claims: Record<string, unknown>) {
 
   const [user] = await db
     .insert(usersTable)
-    .values({ ...userData, role })
+    .values({
+      ...userData,
+      role,
+      ...(isAdmin ? { approvalStatus: "approved" } : {}),
+    })
     .onConflictDoUpdate({
       target: usersTable.id,
       set: {
         ...userData,
-        ...(isAdmin ? { role: "admin" } : {}),
+        ...(isAdmin ? { role: "admin", approvalStatus: "approved" } : {}),
         updatedAt: new Date(),
       },
     })
@@ -510,6 +514,7 @@ router.get("/admin/users/pending", async (req: Request, res: Response) => {
       academicYear: usersTable.academicYear,
       semester: usersTable.semester,
       schoolId: usersTable.schoolId,
+      schoolName: schoolsTable.name,
       institutionalEmail: usersTable.institutionalEmail,
       studentIdImageUrl: usersTable.studentIdImageUrl,
       approvalStatus: usersTable.approvalStatus,
@@ -517,6 +522,7 @@ router.get("/admin/users/pending", async (req: Request, res: Response) => {
       createdAt: usersTable.createdAt,
     })
     .from(usersTable)
+    .leftJoin(schoolsTable, eq(usersTable.schoolId, schoolsTable.id))
     .where(eq(usersTable.approvalStatus, "pending"))
     .orderBy(usersTable.createdAt);
   res.json(rows);
