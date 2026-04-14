@@ -88,10 +88,12 @@ export default function Browse() {
   const { data: folderData, isLoading: isLoadingFolders } = useListFolders({ parentId: folderId });
   const { data: resourceData, isLoading: isLoadingResources } = useListResources(
     { folderId: folderId || "root" },
-    { query: { enabled: !!folderId } }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    { query: { enabled: !!folderId } as any }
   );
   const { data: pathData } = useGetFolderPath(folderId || "", {
-    query: { enabled: !!folderId },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    query: { enabled: !!folderId } as any,
   });
 
   const createFolderMut = useCreateFolder({

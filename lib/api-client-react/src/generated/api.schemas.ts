@@ -13,6 +13,7 @@ export type AuthUserRole = (typeof AuthUserRole)[keyof typeof AuthUserRole];
 
 export const AuthUserRole = {
   student: "student",
+  moderator: "moderator",
   admin: "admin",
 } as const;
 
@@ -21,22 +22,9 @@ export interface AuthUser {
   username?: string;
   firstName?: string;
   lastName?: string;
-  email?: string | null;
   profileImageUrl?: string;
   role: AuthUserRole;
   unitsBalance: number;
-  nickname?: string | null;
-  program?: string | null;
-  academicYear?: string | null;
-  semester?: string | null;
-  onboardingCompleted?: boolean;
-  isTrialActive: boolean;
-  trialDaysRemaining: number;
-  trialEndsAt: string;
-  schoolId?: string | null;
-  institutionalEmail?: string | null;
-  approvalStatus?: "pending" | "approved" | "rejected";
-  rejectionReason?: string | null;
 }
 
 export interface GetCurrentAuthUserResponse {
@@ -171,6 +159,7 @@ export type AdminUserRole = (typeof AdminUserRole)[keyof typeof AdminUserRole];
 
 export const AdminUserRole = {
   student: "student",
+  moderator: "moderator",
   admin: "admin",
 } as const;
 
@@ -184,6 +173,7 @@ export interface AdminUser {
   unitsBalance: number;
   createdAt: string;
   downloadCount?: number;
+  isPermanentAdmin?: boolean;
 }
 
 export interface AdminUserListResponse {
@@ -195,6 +185,7 @@ export type UpdateUserRoleBodyRole =
 
 export const UpdateUserRoleBodyRole = {
   student: "student",
+  moderator: "moderator",
   admin: "admin",
 } as const;
 

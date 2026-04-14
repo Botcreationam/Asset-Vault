@@ -87,8 +87,8 @@ async function getSignedUrl(bucketName: string, objectName: string, method: "GET
     const text = await response.text();
     throw new Error(`Sidecar signing failed (${response.status}): ${text}`);
   }
-  const { signed_url } = await response.json();
-  return signed_url;
+  const data = await response.json() as { signed_url: string };
+  return data.signed_url;
 }
 
 function parseResourceRow(row: typeof resourcesTable.$inferSelect) {
@@ -343,18 +343,18 @@ router.get("/resources/:resourceId/view", async (req, res) => {
 // ── Secure stream proxy (no raw GCS URL exposed to browser) ─────────────────
 router.get("/resources/:resourceId/stream", enforceDeviceLimit, contentSecurityHeaders, async (req, res) => {
   try {
-    const resourceId = req.params.resourceId;
+    const resourceId = String(req.params.resourceId);
     if (!resourceId) {
       res.status(400).send("Missing resource ID");
       return;
     }
 
-    if (!checkStreamRateLimit(req.user.id, resourceId)) {
+    if (!checkStreamRateLimit(req.user!.id, resourceId)) {
       res.status(429).send("Too many requests. Please try again later.");
       return;
     }
 
-    const suspiciousCheck = checkSuspiciousActivity(req.user.id, resourceId);
+    const suspiciousCheck = checkSuspiciousActivity(req.user!.id, resourceId);
     if (!suspiciousCheck.allowed) {
       res.status(403).send(suspiciousCheck.reason);
       return;

@@ -11,7 +11,9 @@ type AuditAction =
   | "grant_units"
   | "profile_update"
   | "user_registered"
-  | "units_welcome";
+  | "units_welcome"
+  | "approve_user"
+  | "reject_user";
 
 export async function logAudit(
   action: AuditAction,

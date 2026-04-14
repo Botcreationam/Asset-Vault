@@ -670,7 +670,7 @@ components:
           type: string
         role:
           type: string
-          enum: [student, admin]
+          enum: [student, moderator, admin]
         unitsBalance:
           type: integer
       required:
@@ -938,7 +938,7 @@ components:
           type: string
         role:
           type: string
-          enum: [student, admin]
+          enum: [student, moderator, admin]
         unitsBalance:
           type: integer
         createdAt:
@@ -946,6 +946,8 @@ components:
           format: date-time
         downloadCount:
           type: integer
+        isPermanentAdmin:
+          type: boolean
       required:
         - id
         - role
@@ -967,7 +969,7 @@ components:
       properties:
         role:
           type: string
-          enum: [student, admin]
+          enum: [student, moderator, admin]
       required:
         - role
 

@@ -371,9 +371,9 @@ router.get("/callback", async (req: Request, res: Response) => {
     user: {
       id: dbUser.id,
       email: dbUser.email,
-      firstName: dbUser.firstName,
-      lastName: dbUser.lastName,
-      profileImageUrl: dbUser.profileImageUrl,
+      firstName: dbUser.firstName ?? undefined,
+      lastName: dbUser.lastName ?? undefined,
+      profileImageUrl: dbUser.profileImageUrl ?? undefined,
     },
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token,
@@ -534,7 +534,7 @@ router.post("/admin/users/:id/approve", async (req: Request, res: Response) => {
     res.status(403).json({ error: "Admin only" });
     return;
   }
-  const { id } = req.params;
+  const id = req.params.id as string;
   const [user] = await db
     .update(usersTable)
     .set({ approvalStatus: "approved", rejectionReason: null, updatedAt: new Date() })
@@ -573,7 +573,7 @@ router.post("/admin/users/:id/reject", async (req: Request, res: Response) => {
     res.status(403).json({ error: "Admin only" });
     return;
   }
-  const { id } = req.params;
+  const id = req.params.id as string;
   const reason = typeof req.body.reason === "string" ? req.body.reason.trim() : "";
 
   const [user] = await db

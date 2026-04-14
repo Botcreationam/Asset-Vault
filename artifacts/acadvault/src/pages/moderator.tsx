@@ -539,7 +539,7 @@ function FoldersTab() {
                 {folders.map((f: any) => (
                   <TableRow key={f.id}>
                     <TableCell className="font-medium">
-                      {renaming?.id === f.id ? (
+                      {renaming && renaming.id === f.id ? (
                         <div className="flex items-center gap-2">
                           <Input
                             value={renaming.name}

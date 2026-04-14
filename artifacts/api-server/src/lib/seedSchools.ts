@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { db } from "@workspace/db";
 import { schoolsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
@@ -47,6 +48,7 @@ export async function seedSchoolsIfEmpty() {
     console.log(`[seed] Seeding ${ZAMBIAN_INSTITUTIONS.length} Zambian institutions...`);
     await db.insert(schoolsTable).values(
       ZAMBIAN_INSTITUTIONS.map((inst) => ({
+        id: randomUUID(),
         ...inst,
         isActive: true,
       }))

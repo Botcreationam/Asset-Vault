@@ -278,6 +278,7 @@ export const AdminListUsersResponse = zod.object({
       unitsBalance: zod.number(),
       createdAt: zod.date(),
       downloadCount: zod.number().optional(),
+      isPermanentAdmin: zod.boolean().optional(),
     }),
   ),
 });
@@ -303,6 +304,7 @@ export const AdminUpdateUserRoleResponse = zod.object({
   unitsBalance: zod.number(),
   createdAt: zod.date(),
   downloadCount: zod.number().optional(),
+  isPermanentAdmin: zod.boolean().optional(),
 });
 
 /**

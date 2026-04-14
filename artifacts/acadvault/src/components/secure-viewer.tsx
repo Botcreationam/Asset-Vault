@@ -23,6 +23,14 @@ export function SecureViewer({
   const [warningMessage, setWarningMessage] = useState("This action is disabled for protected content");
   const [drmSupported, setDrmSupported] = useState(false);
 
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (e: Event) => e.preventDefault();
+    el.addEventListener("selectstart", handler);
+    return () => el.removeEventListener("selectstart", handler);
+  }, []);
+
   const triggerWarning = useCallback((msg?: string) => {
     setWarningMessage(msg || "This action is disabled for protected content");
     setShowWarning(true);
@@ -230,7 +238,6 @@ export function SecureViewer({
         onContextMenu={blockContext}
         onMouseDown={(e) => { if (e.detail > 1) e.preventDefault(); }}
         onDragStart={(e) => e.preventDefault()}
-        onSelectStart={(e: any) => e.preventDefault()}
       >
         {isHidden && (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black transition-all duration-100">

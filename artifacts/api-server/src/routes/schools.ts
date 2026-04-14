@@ -51,7 +51,7 @@ router.patch("/admin/schools/:id", async (req: Request, res: Response) => {
     res.status(403).json({ error: "Admin only" });
     return;
   }
-  const { id } = req.params;
+  const id = req.params.id as string;
   const body = CreateSchoolBody.partial().merge(z.object({ isActive: z.boolean().optional() })).safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: "Invalid data", details: body.error.flatten() });

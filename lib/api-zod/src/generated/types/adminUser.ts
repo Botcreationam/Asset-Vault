@@ -17,4 +17,5 @@ export interface AdminUser {
   unitsBalance: number;
   createdAt: Date;
   downloadCount?: number;
+  isPermanentAdmin?: boolean;
 }

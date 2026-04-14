@@ -70,11 +70,13 @@ export default function ResourceDetail() {
   const [isDownloading, setIsDownloading] = useState(false);
 
   const { data: resource, isLoading: isLoadingResource } = useGetResource(resourceId, {
-    query: { enabled: !!resourceId },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    query: { enabled: !!resourceId } as any,
   });
 
   const { data: pathData } = useGetFolderPath(resource?.folderId || "", {
-    query: { enabled: !!resource?.folderId },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    query: { enabled: !!resource?.folderId } as any,
   });
 
   const downloadMutation = useDownloadResource({

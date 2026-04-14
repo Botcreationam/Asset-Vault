@@ -25,7 +25,8 @@ export default function SearchResults() {
 
   const { data, isLoading } = useListResources(
     { search: activeSearch },
-    { query: { enabled: activeSearch.length > 0 } }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    { query: { enabled: activeSearch.length > 0 } as any }
   );
 
   const handleSearch = (e: React.FormEvent) => {

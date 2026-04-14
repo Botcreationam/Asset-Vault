@@ -362,12 +362,14 @@ function ResourceUploadTab({ folders }: { folders: any[] }) {
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!file)
-      return toast({
+    if (!file) {
+      toast({
         title: "Error",
         description: "Please select a file",
         variant: "destructive",
       });
+      return;
+    }
 
     const fd = new FormData(e.currentTarget);
     createResourceMut.mutate({
