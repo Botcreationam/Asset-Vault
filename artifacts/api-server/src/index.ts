@@ -2,6 +2,7 @@ import http from "http";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { setupWebSocket } from "./lib/websocket";
+import { seedSchoolsIfEmpty } from "./lib/seedSchools";
 
 const rawPort = process.env["PORT"];
 
@@ -22,6 +23,7 @@ setupWebSocket(server);
 
 server.listen(port, () => {
   logger.info({ port }, "Server listening");
+  seedSchoolsIfEmpty();
 });
 
 server.on("error", (err) => {
