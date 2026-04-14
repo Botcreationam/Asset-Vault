@@ -43,10 +43,9 @@ function OnboardingGuard() {
         return;
       }
       // Onboarded but pending/rejected → go to pending-approval screen
-      const status = (user as any).approvalStatus;
       if (
         user.onboardingCompleted &&
-        (status === "pending" || status === "rejected") &&
+        (user.approvalStatus === "pending" || user.approvalStatus === "rejected") &&
         user.role !== "admin" &&
         location !== "/pending-approval"
       ) {

@@ -2,16 +2,23 @@ import { useAuth } from "@workspace/replit-auth-web";
 import { BASE_URL } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { GraduationCap, Clock, Mail, MessageCircle, LogOut, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function PendingApproval() {
-  const { user, refetch } = useAuth() as any;
+  const { user, refetch } = useAuth();
   const [checking, setChecking] = useState(false);
+
+  // If the user somehow ends up here but is approved, redirect to home
+  useEffect(() => {
+    if (user && (user as any).approvalStatus === "approved") {
+      window.location.href = BASE_URL;
+    }
+  }, [user]);
 
   async function checkStatus() {
     setChecking(true);
     try {
-      await refetch?.();
+      await refetch();
     } finally {
       setChecking(false);
     }
@@ -21,7 +28,7 @@ export default function PendingApproval() {
     window.location.href = `${BASE_URL}api/logout`;
   }
 
-  const isRejected = user?.approvalStatus === "rejected";
+  const isRejected = (user as any)?.approvalStatus === "rejected";
 
   return (
     <div className="min-h-screen bg-[#0B1120] flex items-center justify-center p-6">
@@ -44,10 +51,10 @@ export default function PendingApproval() {
             <p className="text-white/60 text-sm leading-relaxed mb-4">
               Unfortunately, your registration was not approved at this time.
             </p>
-            {user?.rejectionReason && (
+            {(user as any)?.rejectionReason && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-6 text-left">
                 <p className="text-xs font-semibold text-red-400 mb-1">Reason</p>
-                <p className="text-white/80 text-sm">{user.rejectionReason}</p>
+                <p className="text-white/80 text-sm">{(user as any).rejectionReason}</p>
               </div>
             )}
             <p className="text-white/50 text-sm mb-6">
@@ -75,7 +82,6 @@ export default function PendingApproval() {
         ) : (
           /* Pending state */
           <div className="bg-[#142042] rounded-2xl border border-[#D9A014]/20 p-8 text-center shadow-2xl">
-            {/* Animated clock */}
             <div className="w-16 h-16 rounded-full bg-[#D9A014]/10 border border-[#D9A014]/20 flex items-center justify-center mx-auto mb-6">
               <Clock className="w-8 h-8 text-[#D9A014]" />
             </div>
@@ -84,27 +90,27 @@ export default function PendingApproval() {
               Account pending review
             </h1>
             <p className="text-white/60 text-sm leading-relaxed mb-6">
-              Hi <span className="text-white font-semibold">{user?.nickname || user?.firstName || "there"}</span> 👋 — your registration is in the queue.
+              Hi <span className="text-white font-semibold">{(user as any)?.nickname || user?.firstName || "there"}</span> 👋 — your registration is in the queue.
               An admin will review your details and approve your account shortly.
             </p>
 
             {/* Status card */}
             <div className="bg-[#0B1120]/60 rounded-xl border border-white/10 p-5 mb-6 text-left space-y-3">
-              {user?.schoolId && (
+              {(user as any)?.schoolId && (
                 <div className="flex items-start gap-3">
                   <span className="text-lg">🏫</span>
                   <div>
                     <p className="text-xs text-white/40 uppercase tracking-wider font-semibold mb-0.5">Institution</p>
-                    <p className="text-white/80 text-sm">{user?.schoolId}</p>
+                    <p className="text-white/80 text-sm">{(user as any).schoolId}</p>
                   </div>
                 </div>
               )}
-              {user?.email && (
+              {(user as any)?.email && (
                 <div className="flex items-start gap-3">
                   <Mail className="w-5 h-5 text-white/30 mt-0.5 shrink-0" />
                   <div>
                     <p className="text-xs text-white/40 uppercase tracking-wider font-semibold mb-0.5">Email</p>
-                    <p className="text-white/80 text-sm">{user.email}</p>
+                    <p className="text-white/80 text-sm">{(user as any).email}</p>
                   </div>
                 </div>
               )}
@@ -130,7 +136,9 @@ export default function PendingApproval() {
                 disabled={checking}
                 className="bg-[#D9A014] hover:bg-[#D9A014]/90 text-[#0B1120] font-bold gap-2"
               >
-                {checking ? <><RefreshCw className="w-4 h-4 animate-spin" /> Checking…</> : <><RefreshCw className="w-4 h-4" /> Check approval status</>}
+                {checking
+                  ? <><RefreshCw className="w-4 h-4 animate-spin" /> Checking…</>
+                  : <><RefreshCw className="w-4 h-4" /> Check approval status</>}
               </Button>
               <a
                 href="https://wa.me/260978277538"

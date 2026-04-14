@@ -84,7 +84,7 @@ const STEPS = [
 ];
 
 export default function Onboarding() {
-  const { user, refetch } = useAuth() as any;
+  const { user, refetch } = useAuth();
   const { toast } = useToast();
 
   const [step, setStep] = useState(1);
@@ -204,7 +204,7 @@ export default function Onboarding() {
         throw new Error(err.error || "Failed to save profile");
       }
 
-      await refetch?.();
+      await refetch();
       window.location.href = import.meta.env.BASE_URL || "/";
     } catch (err: any) {
       toast({ title: err.message || "Something went wrong", variant: "destructive" });
