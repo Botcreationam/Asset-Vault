@@ -1,228 +1,55 @@
-# Workspace
+# Overview
 
-## Overview
+AcadVault is a secure, pnpm workspace monorepo project built with TypeScript, offering an academic resource platform where students can access and download educational materials. The platform aims to provide free viewing of resources and paid downloads using an in-app unit system. It includes features like hierarchical folder organization, social interaction via a newsfeed and real-time chat, and robust content protection mechanisms. The project's vision is to create a comprehensive and secure ecosystem for academic resource sharing with a focus on user experience and content integrity.
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+# User Preferences
 
-**AcadVault** — A secure academic resource platform where students can read books, lecture slides, and notes for free, and pay units to download them.
+I prefer concise and accurate responses. When making changes, prioritize robust, scalable solutions. I appreciate clear explanations of architectural decisions. Do not make changes to files within `artifacts/acadvault-mobile` unless specifically requested.
 
-## Stack
+# System Architecture
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
-- **Auth**: Replit Auth (OIDC/PKCE) via `@workspace/replit-auth-web`
-- **File Storage**: Google Cloud Storage (Replit App Storage) via `@google-cloud/storage`
-- **Frontend**: React + Vite + Tailwind CSS + shadcn/ui
+The project is structured as a pnpm monorepo with separate packages for the API server, web frontend, and mobile application.
 
-## Structure
+**Core Technologies:**
+- **Backend:** Node.js 24, Express 5, PostgreSQL, Drizzle ORM, Zod for validation.
+- **Frontend:** React, Vite, Tailwind CSS, shadcn/ui.
+- **Mobile:** Expo React Native.
+- **Authentication:** Replit Auth (OIDC/PKCE).
+- **File Storage:** Google Cloud Storage (Replit App Storage).
+- **API Generation:** Orval from OpenAPI spec.
+- **Build System:** esbuild.
 
-```text
-artifacts-monorepo/
-├── artifacts/
-│   ├── api-server/         # Express API server
-│   ├── acadvault/          # React + Vite frontend
-│   └── acadvault-mobile/   # Expo React Native mobile app
-├── lib/
-│   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   ├── db/                 # Drizzle ORM schema + DB connection
-│   └── replit-auth-web/    # Replit Auth browser package
-├── pnpm-workspace.yaml
-├── tsconfig.base.json
-├── tsconfig.json
-└── package.json
-```
+**Monorepo Structure:**
+- `artifacts/`: Contains main applications (`api-server`, `acadvault` web, `acadvault-mobile`).
+- `lib/`: Houses shared libraries (`api-spec`, `api-client-react`, `api-zod`, `db`, `replit-auth-web`).
 
-## Database Schema
+**Database Schema Highlights:**
+- **Users:** `users` (id, role, profile, onboarding status), `user_units`, `units_transactions`, `user_active_sessions`.
+- **Resources:** `folders`, `resources` (storagePath, downloadCost), `resource_ratings`, `resource_bookmarks`, `material_requests`.
+- **Social:** `posts`, `post_comments`, `post_reactions`, `conversations`, `conversation_participants`, `messages`.
+- **System:** `sessions`, `audit_logs`, `notifications`.
 
-- **users** — Replit Auth users (id, username, email, firstName, lastName, profileImageUrl, role: student|moderator|admin)
-- **sessions** — Auth sessions (Replit Auth managed)
-- **folders** — Hierarchical folder structure (id, name, description, parentId, level, icon)
-- **resources** — Academic files (id, name, type, folderId, storagePath, fileSize, mimeType, downloadCost, tags, viewCount, downloadCount)
-- **user_units** — Unit balances per user
-- **units_transactions** — Transaction history (credit/debit)
-- **audit_logs** — Immutable audit trail (action, actorId, targetId, details, createdAt)
-- **posts** — Social feed posts (id, authorId, content, imageUrl, likesCount, commentsCount, createdAt)
-- **post_comments** — Comments on posts (id, postId, authorId, content, createdAt)
-- **post_reactions** — Like reactions on posts (id, postId, userId, createdAt; unique per user+post)
-- **user_active_sessions** — Device/session tracking (id, userId, sessionId, deviceFingerprint, ipAddress, userAgent, lastActiveAt)
-- **conversations** — Chat conversations (id, name, isGroup, createdAt)
-- **conversation_participants** — Users in a conversation (id, conversationId, userId, joinedAt)
-- **messages** — Chat messages (id, conversationId, senderId, content, createdAt)
-- **resource_ratings** — Star ratings + reviews (id, resourceId, userId, rating 1-5, review, createdAt; unique per user+resource)
-- **notifications** — In-app notifications (id, userId, type, title, body, isRead, relatedId, createdAt)
-- **material_requests** — Student material requests (id, userId, title, description, subject, courseCode, status: pending|in_progress|fulfilled|rejected, adminNote, createdAt)
-- **resource_bookmarks** — Saved resources per user (id, userId, resourceId, createdAt; unique per user+resource)
+**Key Features and Design Decisions:**
+- **Hierarchical Content Organization:** Resources are managed within a `Program -> Year -> Semester -> Subject` folder structure.
+- **Unit-based Economy:** Users can view resources for free and pay units for downloads. Admins manage unit granting.
+- **Three-Tier Role System:** Student, Moderator, and Admin roles with distinct permissions and dedicated portals.
+- **Content Protection System:**
+    - Secure streaming via authenticated backend proxy with range-based requests.
+    - Client-side protections: Keyboard shortcut blocking, right-click prevention, copy/paste blocking, text selection disabling, print blocking, visibility API blur.
+    - DRM-like features: Encrypted Media Extensions (EME) for screen capture protection, screen recording interception, PrintScreen key blocking.
+    - User-specific watermarking (email/ID + forensic grid).
+    - Iframe sandboxing for viewer, no-cache headers, and strict Content-Security-Policy.
+- **Real-time Interactions:** Social feed and chat use WebSockets for live updates.
+- **User Onboarding & Personalization:** First-time users complete an onboarding flow to personalize content discovery based on academic profile.
+- **Device & Session Management:** Tracks active user sessions with limits and automatic cleanup.
+- **Security Enhancements:** Rate limiting on all write endpoints, restricted CORS, comprehensive security headers, atomic balance operations, input validation, WebSocket protection, and suspicious activity detection (cross-resource streaming monitoring, per-resource rate limits).
+- **Mobile Experience:** The `acadvault-mobile` app is an Expo React Native application designed for native performance, matching web app design tokens, and trial-aware features.
 
-## Key Features
+# External Dependencies
 
-1. **Hierarchical Folders**: Program → Year → Semester → Subject
-2. **Free Viewing**: PDFs/slides viewable in-browser via signed URL (free for authenticated users)
-3. **Paid Downloads**: 5 units per download (configurable per resource)
-4. **Units System**: Admin can grant units; transaction history tracked
-5. **Admin Panel**: Upload resources, manage folders, manage users, grant units, view analytics
-6. **Admin Analytics Dashboard**: Real-time stats — total users, downloads, views, top resources, units circulating, avg ratings, pending requests
-7. **Protected Storage**: Files stored in GCS via App Storage; signed URLs expire (60min view, 15min download)
-8. **Social Feed**: Facebook-style newsfeed with posts, comments, and likes (real-time via WebSocket)
-9. **Real-Time Chat**: Direct messaging between users with WebSocket-powered live updates
-10. **Profile Photos**: Upload profile photos (max 2MB; JPEG/PNG/GIF/WebP only) from the account page
-11. **Ratings & Reviews**: 5-star ratings with written reviews on each resource detail page; bar chart distribution shown
-12. **In-App Notifications**: Bell icon in header with unread badge; auto-polls every 30s; mark-all-read; triggered on unit grants and material request fulfillment
-13. **Material Requests**: Students request missing resources; admins manage status (pending → in_progress → fulfilled/rejected) with admin notes; fulfilled requests send notifications
-14. **PWA Support**: `manifest.json` with theme colors + apple-touch-icon meta tags for installable web app
-15. **Moderator Role**: Three-tier role system (student → moderator → admin). Moderators can manage folders, upload/delete resources, moderate posts/comments (including a comment delete endpoint), and respond to material requests. They are blocked from: granting units, changing user roles, viewing analytics, and system settings. Moderators get a dedicated `/moderator` portal with Requests, Posts, and Folders tabs. Admins assign the moderator role via the Admin Portal user management.
-17. **Onboarding Flow**: First-time users (after any login) are automatically redirected to a mandatory `/onboarding` page (full-screen, outside sidebar) where they enter nickname, course/programme, academic year, and semester. Data saved to `onboardingCompleted`, `nickname`, `program`, `academicYear`, `semester` fields on users table. Repeat visits skip onboarding if already completed. Account page has an "Academic Profile" card to update these details at any time. The home page shows a "Personalised for You" resource row when onboarding is complete.
-18. **Content Moderation**: Posts and comments are scanned against a regex-based offensive language filter (`artifacts/api-server/src/lib/moderation.ts`) before being stored. Returns HTTP 422 with a user-friendly error message when inappropriate content is detected. Covers common slurs, profanity, and harmful phrases.
-19. **Personalized Content**: `GET /api/discovery/for-you` endpoint matches folder names against the user's program/year/semester using ILIKE queries. Results shown as a highlighted "Personalised for You" row on the home page (only visible after onboarding). Academic profile stored on the user object and available throughout the app.
-16. **Discovery & Saved Resources**: Home page has live stats bar (total resources, views, downloads) + three horizontal scrollable resource rows (Trending, Top Rated, Recent). Bookmark button on every resource card (browse page) and resource detail page — toggles save with optimistic update. `/bookmarks` page shows all saved resources. Account page has a Downloads tab alongside Transactions showing download history with resource type icons and relative timestamps. Discovery API routes: `/api/discovery/trending`, `/top-rated`, `/recent`, `/stats`. Bookmarks API: `/api/bookmarks` (GET list), `/api/bookmarks/:id` (POST toggle), `/api/bookmarks/check/:id`. Download history: `/api/users/me/downloads`. Shared utilities: `@/lib/resource-utils` with `getResourceIcon(type, size?)` and `formatBytes(bytes?)`.
-
-## Security
-
-- **Rate Limiting**: All write endpoints rate-limited (posts: 10/min, comments: 30/min, reactions: 60/min, messages: 60/min, uploads: 5/5min, downloads: 10/min, global: 200/min per user)
-- **CORS**: Restricted to known Replit origins only (not `origin: true`)
-- **Security Headers**: X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy on all responses
-- **Atomic Balance Operations**: Download deductions use SQL `WHERE balance >= cost` to prevent race conditions
-- **Input Validation**: Post max 2000 chars, comment max 1000 chars, message max 5000 chars, MIME validation on uploads
-- **WebSocket Protection**: Max 5 connections per user, session-cookie auth required
-- **Self-Service Topup Disabled**: Only admins can topup units; prevents free-unit abuse
-- **Search Sanitization**: LIKE wildcards (`%`, `_`) stripped from search input
-
-### Content Protection System
-- **Secure Streaming**: All content served through authenticated backend proxy (`/resources/:id/stream`), never via raw storage URLs
-- **Range-based Streaming**: HTTP Range request support for chunked content delivery (partial content / 206 responses)
-- **Keyboard Shortcut Blocking**: Ctrl+S, Ctrl+P, Ctrl+C, Ctrl+A, Ctrl+U, F12, PrintScreen, DevTools shortcuts all intercepted
-- **Right-click Prevention**: Context menu disabled on the viewer
-- **Copy/Cut/Paste Blocking**: Clipboard events intercepted at document level while viewing
-- **Drag Prevention**: DragStart and Drop events blocked globally
-- **Text Selection Disabled**: CSS `user-select: none` with vendor prefixes
-- **Print Blocking**: CSS `@media print` hides all content and shows a "printing disabled" message
-- **Visibility API Blur**: Content hidden with black screen when user switches tabs or window loses focus (screenshot prevention)
-- **DRM Screen Capture Protection**: Uses Encrypted Media Extensions (EME) with ClearKey — the DRM video overlay causes screen capture tools to record a black screen instead of content (same technique as Netflix/WhatsApp)
-- **Screen Recording Interception**: `getDisplayMedia` API is intercepted — content auto-hides when screen sharing/recording begins
-- **PrintScreen Key Blocking**: PrintScreen key captured and content immediately hidden for 3 seconds with warning message
-- **User-specific Watermarking**: Two overlay layers — diagonal email/ID watermark + secondary user ID grid for forensic identification
-- **Iframe Sandbox**: Viewer iframe sandboxed (no `allow-downloads`) to prevent save-file dialogs
-- **No-Cache Headers**: `Cache-Control: no-store, no-cache, must-revalidate`, `Pragma: no-cache`, `Expires: 0` on all streamed content
-- **Content-Security-Policy**: `script-src 'none'; object-src 'none'; frame-ancestors 'self'` on streamed responses
-
-### Device & Session Management
-- **Device Limit**: Max 3 active sessions/devices per user; oldest session auto-evicted when limit exceeded
-- **Session Tracking**: `user_active_sessions` table stores device fingerprints, IP addresses, user agents, last-active timestamps
-- **Automatic Cleanup**: Sessions older than 30 minutes auto-purged
-- **Active Sessions API**: `GET /api/user/active-sessions` lets users see their active devices
-
-### Suspicious Activity Detection
-- **Cross-resource Monitoring**: In-memory tracker detects when a user streams >20 distinct resources within a 5-minute window
-- **Automatic Blocking**: Suspicious users are temporarily blocked from streaming for 15 minutes
-- **Per-resource Rate Limit**: Max 60 stream requests per user per resource per hour
-
-## API Routes
-
-All routes at `/api`:
-
-- `GET /healthz` — health check
-- `GET /auth/user` — current user + units balance
-- `GET /login`, `GET /callback`, `GET /logout` — Replit Auth OIDC flow
-- `GET/POST /folders` — list root folders / create folder (admin)
-- `GET/DELETE /folders/:id` — get/delete folder
-- `GET /folder-path/:id` — breadcrumb path
-- `GET/POST /resources` — list resources / upload resource (admin, multipart)
-- `GET/DELETE/PATCH /resources/:id` — get/delete/update resource
-- `GET /resources/:id/view` — signed view URL (auth required)
-- `POST /resources/:id/download` — spend units + get download URL (auth required)
-- `GET /units/balance` — user's current balance
-- `GET /units/transactions` — transaction history
-- `POST /units/topup` — add units (self-service)
-- `GET /admin/users` — list all users (admin)
-- `PATCH /admin/users/:id/role` — change user role (admin)
-- `POST /admin/users/:id/units` — grant units to user (admin)
-- `GET /admin/analytics` — platform analytics: users, downloads, top resources, ratings, requests (admin)
-- `GET /resources/:id/ratings` — get ratings + average for a resource
-- `POST /resources/:id/ratings` — submit or update a rating (auth required)
-- `DELETE /resources/:id/ratings` — remove own rating (auth required)
-- `GET /notifications` — user's notifications + unread count (auth required)
-- `PATCH /notifications/read-all` — mark all notifications read (auth required)
-- `PATCH /notifications/:id/read` — mark single notification read (auth required)
-- `GET /material-requests` — list requests (own for students; all for admin)
-- `POST /material-requests` — submit a material request (auth required)
-- `PATCH /material-requests/:id` — update request status (admin)
-
-## Packages
-
-### `artifacts/api-server` (`@workspace/api-server`)
-
-Express 5 API server. Routes in `src/routes/`.
-
-- `folders.ts` — folder CRUD
-- `resources.ts` — resource upload/view/download with GCS signed URLs + units deduction
-- `units.ts` — units balance, transactions, admin management
-- `auth.ts` — Replit OIDC auth flow + profile photo upload
-- `social.ts` — social feed: posts CRUD, comments, reactions (likes)
-- `chat.ts` — chat: conversations, messages, user list
-- `lib/websocket.ts` — WebSocket server for real-time chat and feed updates
-
-### `artifacts/acadvault` (`@workspace/acadvault`)
-
-React + Vite frontend. Pages in `src/pages/`:
-
-- `home.tsx` — landing page with search, hero, featured folders
-- `browse.tsx` — hierarchical folder browser with breadcrumbs
-- `resource-detail.tsx` — resource viewer (PDF iframe) + download with units
-- `search.tsx` — search results
-- `feed.tsx` — social newsfeed with posts, comments, likes (real-time)
-- `chat.tsx` — real-time chat with conversations and messages
-- `account.tsx` — user profile + unit balance + transaction history + profile photo upload
-- `admin.tsx` — admin dashboard: folders, upload resources, manage users
-- `hooks/use-websocket.ts` — shared singleton WebSocket client with auto-reconnect
-
-### `artifacts/acadvault-mobile` (`@workspace/acadvault-mobile`)
-
-Expo React Native mobile app. Fully optimized for native mobile experience.
-
-- **Font**: Plus Jakarta Sans (matching web app)
-- **Design tokens**: Navy `#142042`, gold `#D9A014`, dark `#0B1120` — synced from web app
-- **Auth**: `AuthContext.tsx` — uses `expo-web-browser` for Replit Auth; User type includes `isTrialActive`, `trialDaysRemaining`, `trialEndsAt`, `role: student|moderator|admin`, `nickname`, `program`, `academicYear`, `semester`, `onboardingCompleted`
-- **Navigation**: Bottom tab bar (NativeTabs on iOS 26 with liquid glass, BlurView fallback on older iOS, classic on Android)
-- **Library tab**: Discovery home with branded navy hero card + trial badge + trending/recent horizontal carousels; folder browser with breadcrumb nav when drilling into a folder
-- **Feed tab**: Compose post box with avatar, full comment support (view + add inline per post), like with haptic feedback
-- **Search tab**: Live debounced search (350ms), type filter chips (All/PDF/Notes/Books/Slides/Videos), no submit button needed
-- **Account tab**: Gradient profile hero card, trial status card (amber when active), units balance card, academic profile, transaction history, pull-to-refresh
-- **Resource detail**: Trial-aware download — free amber button during trial; normal cost card with balance check when trial is over
-- **API connection**: `setBaseUrl` from `@workspace/api-client-react` with `EXPO_PUBLIC_DOMAIN` env var
-- **Discovery API**: Uses `/api/discovery/trending` and `/api/discovery/recent` for home carousels
-- **Comments API**: Uses `/api/social/posts/:id/comments` GET/POST for inline comment threads
-- **CORS**: API server allows `REPLIT_EXPO_DEV_DOMAIN` origin for cross-domain mobile web preview
-- **Safe areas**: `useSafeAreaInsets()` used throughout; all screens respect bottom tab bar height (110px padding)
-
-### `lib/db` (`@workspace/db`)
-
-Push schema: `pnpm --filter @workspace/db run push`
-
-### `lib/api-spec` (`@workspace/api-spec`)
-
-Run codegen: `pnpm --filter @workspace/api-spec run codegen`
-
-## Development
-
-- `pnpm --filter @workspace/api-server run dev` — API server (port 8080)
-- `pnpm --filter @workspace/acadvault run dev` — web frontend (port 22689)
-- `pnpm --filter @workspace/acadvault-mobile run dev` — mobile app (port 20808)
-
-## Admin Setup
-
-Admin users are determined by the `ADMIN_EMAILS` environment variable (comma-separated list of email addresses). If not set, no users are auto-promoted to admin on login.
-
-**Permanent (Super) Admins**: Emails listed in `ADMIN_EMAILS` are permanently protected — they cannot be demoted to student by any other admin. They appear with a "Super Admin" badge in the admin panel, and the role selector is hidden for them. The server enforces this with a 403 response if anyone tries to change their role via API.
-
-To manually make the first admin user:
-```sql
-UPDATE users SET role = 'admin' WHERE id = '<your-replit-user-id>';
-```
+- **Database:** PostgreSQL
+- **ORM:** Drizzle ORM
+- **Authentication:** Replit Auth (OIDC/PKCE)
+- **Cloud Storage:** Google Cloud Storage (via `@google-cloud/storage`)
+- **Frontend UI Library:** shadcn/ui
+- **Mobile Development Framework:** Expo
