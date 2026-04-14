@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -68,21 +68,45 @@ export default function OnboardingScreen() {
   const [studentIdUrl, setStudentIdUrl] = useState<string | null>(null);
   const [uploadingId, setUploadingId] = useState(false);
 
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleSchoolSearch(text: string) {
+    setSchoolSearch(text);
+    setSelectedSchool(null);
+    setShowSchoolList(true);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(text), 200);
+  }
+
   useEffect(() => {
     fetch(`${BASE}/api/schools`, { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data)) setSchools(data);
+        if (Array.isArray(data)) {
+          // Sort alphabetically client-side
+          setSchools([...data].sort((a, b) => a.name.localeCompare(b.name)));
+        }
         setLoadingSchools(false);
       })
       .catch(() => setLoadingSchools(false));
   }, []);
 
-  const filteredSchools = schools.filter(
-    (s) =>
-      s.name.toLowerCase().includes(schoolSearch.toLowerCase()) ||
-      (s.shortName || "").toLowerCase().includes(schoolSearch.toLowerCase())
-  );
+  const MAX_VISIBLE = 8;
+
+  // Memoised filtered list based on debounced query
+  const filteredSchools = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    if (!q) return schools;
+    return schools.filter(
+      (s) =>
+        s.name.toLowerCase().startsWith(q) ||
+        s.name.toLowerCase().includes(q) ||
+        (s.shortName || "").toLowerCase().startsWith(q) ||
+        (s.shortName || "").toLowerCase().includes(q)
+    );
+  }, [schools, debouncedSearch]);
+
 
   async function pickStudentId() {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -198,38 +222,71 @@ export default function OnboardingScreen() {
             <Text style={styles.label}>Search your institution</Text>
             <TextInput
               style={styles.input}
-              placeholder="University of Zambia, CBU, ZCAS…"
+              placeholder={loadingSchools ? "Loading institutions..." : "Type to search — e.g. UNZA, CBU..."}
               placeholderTextColor="#64748b"
+              editable={!loadingSchools}
               value={showSchoolList ? schoolSearch : (selectedSchool?.name || schoolSearch)}
-              onChangeText={(t) => {
-                setSchoolSearch(t);
-                setSelectedSchool(null);
-                setShowSchoolList(true);
-              }}
-              onFocus={() => setShowSchoolList(true)}
+              onChangeText={handleSchoolSearch}
+              onFocus={() => { if (!selectedSchool) setShowSchoolList(true); }}
+              autoCorrect={false}
+              autoCapitalize="words"
             />
 
             {showSchoolList && !selectedSchool && (
               <View style={styles.schoolDropdown}>
                 {loadingSchools ? (
                   <ActivityIndicator color="#D9A014" style={{ padding: 16 }} />
-                ) : filteredSchools.length === 0 ? (
-                  <Text style={styles.schoolEmpty}>
-                    {schools.length === 0 ? "Loading…" : "No institution found. Contact support to add yours."}
-                  </Text>
                 ) : (
-                  filteredSchools.slice(0, 8).map((s) => (
-                    <TouchableOpacity
-                      key={s.id}
-                      style={styles.schoolItem}
-                      onPress={() => { setSelectedSchool(s); setShowSchoolList(false); setSchoolSearch(""); }}
-                    >
-                      <Text style={styles.schoolItemName}>{s.name}</Text>
-                      {s.shortName && (
-                        <Text style={styles.schoolItemSub}>{s.shortName} · {s.country}</Text>
+                  <>
+                    {/* Header strip */}
+                    <View style={styles.schoolDropdownHeader}>
+                      <Text style={styles.schoolDropdownHeaderText}>
+                        {debouncedSearch.trim()
+                          ? `${filteredSchools.length} result${filteredSchools.length !== 1 ? "s" : ""} for "${debouncedSearch.trim()}"`
+                          : `${schools.length} institutions · Zambia`}
+                      </Text>
+                      {filteredSchools.length > MAX_VISIBLE && (
+                        <Text style={styles.schoolDropdownHeaderCount}>
+                          Top {MAX_VISIBLE} shown
+                        </Text>
                       )}
-                    </TouchableOpacity>
-                  ))
+                    </View>
+
+                    {filteredSchools.length === 0 ? (
+                      <Text style={styles.schoolEmpty}>
+                        No match for "{debouncedSearch}".{"\n"}
+                        <Text style={{ fontSize: 12 }}>Try searching by abbreviation, e.g. "UNZA" or "CBU".</Text>
+                      </Text>
+                    ) : (
+                      filteredSchools.slice(0, MAX_VISIBLE).map((s) => (
+                        <TouchableOpacity
+                          key={s.id}
+                          style={styles.schoolItem}
+                          onPress={() => { setSelectedSchool(s); setShowSchoolList(false); setSchoolSearch(""); setDebouncedSearch(""); }}
+                        >
+                          <View style={styles.schoolItemAvatar}>
+                            <Text style={styles.schoolItemAvatarText}>
+                              {(s.shortName || s.name).charAt(0)}
+                            </Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.schoolItemName}>{s.name}</Text>
+                            {s.shortName && (
+                              <Text style={styles.schoolItemSub}>{s.shortName} · {s.country}</Text>
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      ))
+                    )}
+
+                    {filteredSchools.length > MAX_VISIBLE && (
+                      <View style={styles.schoolDropdownFooter}>
+                        <Text style={styles.schoolDropdownFooterText}>
+                          {filteredSchools.length - MAX_VISIBLE} more — keep typing to narrow results
+                        </Text>
+                      </View>
+                    )}
+                  </>
                 )}
               </View>
             )}
@@ -239,9 +296,11 @@ export default function OnboardingScreen() {
                 <Text style={styles.selectedSchoolIcon}>🏫</Text>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.selectedSchoolName}>{selectedSchool.name}</Text>
-                  <Text style={styles.selectedSchoolSub}>{selectedSchool.country}</Text>
+                  <Text style={styles.selectedSchoolSub}>
+                    {selectedSchool.shortName ? `${selectedSchool.shortName} · ` : ""}{selectedSchool.country}
+                  </Text>
                 </View>
-                <TouchableOpacity onPress={() => { setSelectedSchool(null); setSchoolSearch(""); }}>
+                <TouchableOpacity onPress={() => { setSelectedSchool(null); setSchoolSearch(""); setDebouncedSearch(""); setShowSchoolList(true); }}>
                   <Text style={styles.selectedSchoolRemove}>✕</Text>
                 </TouchableOpacity>
               </View>
@@ -434,10 +493,17 @@ const styles = StyleSheet.create({
   optional: { fontSize: 11, color: "#64748b", fontWeight: "400" },
   input: { backgroundColor: "#1e2d4a", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, color: "#f1f5f9", fontSize: 15, fontFamily: "PlusJakartaSans_400Regular" },
   schoolDropdown: { backgroundColor: "#1a2a42", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderRadius: 12, marginTop: 4, overflow: "hidden" },
-  schoolItem: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" },
+  schoolDropdownHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, paddingVertical: 8, backgroundColor: "rgba(255,255,255,0.04)", borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" },
+  schoolDropdownHeaderText: { fontSize: 11, color: "#64748b", fontFamily: "PlusJakartaSans_400Regular" },
+  schoolDropdownHeaderCount: { fontSize: 11, color: "#D9A014", fontFamily: "PlusJakartaSans_600SemiBold" },
+  schoolDropdownFooter: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: "rgba(255,255,255,0.04)", borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)", alignItems: "center" },
+  schoolDropdownFooterText: { fontSize: 11, color: "#64748b", fontFamily: "PlusJakartaSans_400Regular" },
+  schoolItem: { paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", flexDirection: "row", alignItems: "center", gap: 10 },
+  schoolItemAvatar: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#142042", alignItems: "center", justifyContent: "center" },
+  schoolItemAvatarText: { fontSize: 12, fontWeight: "700", color: "rgba(255,255,255,0.7)", fontFamily: "PlusJakartaSans_700Bold" },
   schoolItemName: { fontSize: 14, fontWeight: "600", color: "#f1f5f9", fontFamily: "PlusJakartaSans_600SemiBold" },
   schoolItemSub: { fontSize: 12, color: "#64748b", marginTop: 2, fontFamily: "PlusJakartaSans_400Regular" },
-  schoolEmpty: { padding: 16, color: "#64748b", fontSize: 13, textAlign: "center", fontFamily: "PlusJakartaSans_400Regular" },
+  schoolEmpty: { padding: 16, color: "#64748b", fontSize: 13, textAlign: "center", fontFamily: "PlusJakartaSans_400Regular", lineHeight: 20 },
   selectedSchool: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(217,160,20,0.1)", borderWidth: 1, borderColor: "rgba(217,160,20,0.3)", borderRadius: 12, padding: 14, marginTop: 8 },
   selectedSchoolIcon: { fontSize: 22 },
   selectedSchoolName: { fontSize: 14, fontWeight: "700", color: "#f1f5f9", fontFamily: "PlusJakartaSans_700Bold" },
