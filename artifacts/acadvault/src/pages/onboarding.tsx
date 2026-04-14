@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useToast } from "@/hooks/use-toast";
 import { BASE_URL } from "@/lib/api";
@@ -26,7 +26,17 @@ import {
   Search,
   X,
 } from "lucide-react";
+
 import { cn } from "@/lib/utils";
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
 
 const PROGRAMS = [
   "Agriculture",
@@ -92,10 +102,15 @@ export default function Onboarding() {
 
   // Step 1: Institution
   const [schools, setSchools] = useState<School[]>([]);
+  const [schoolsLoading, setSchoolsLoading] = useState(true);
   const [schoolSearch, setSchoolSearch] = useState("");
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Debounce the search so filtering runs 200ms after the user stops typing
+  const debouncedSearch = useDebounce(schoolSearch, 200);
 
   // Step 2: Academic profile
   const [nickname, setNickname] = useState(user?.firstName || user?.username || "");
@@ -112,13 +127,22 @@ export default function Onboarding() {
   const [uploadingId, setUploadingId] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Load all schools once on mount — alphabetically ordered from server
   useEffect(() => {
+    setSchoolsLoading(true);
     fetch(`${BASE_URL}api/schools`, { credentials: "include" })
       .then((r) => r.json())
-      .then((data) => setSchools(Array.isArray(data) ? data : []))
-      .catch(() => {});
+      .then((data) => {
+        if (Array.isArray(data)) {
+          // Ensure alphabetical order client-side too
+          setSchools(data.sort((a, b) => a.name.localeCompare(b.name)));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setSchoolsLoading(false));
   }, []);
 
+  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -129,11 +153,20 @@ export default function Onboarding() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const filteredSchools = schools.filter(
-    (s) =>
-      s.name.toLowerCase().includes(schoolSearch.toLowerCase()) ||
-      (s.shortName || "").toLowerCase().includes(schoolSearch.toLowerCase())
-  );
+  // Memoised filter — runs against the debounced query
+  const filteredSchools = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    if (!q) return schools; // show all when nothing typed
+    return schools.filter(
+      (s) =>
+        s.name.toLowerCase().startsWith(q) ||          // prefix match first (fastest UX)
+        s.name.toLowerCase().includes(q) ||            // substring match
+        (s.shortName || "").toLowerCase().startsWith(q) ||
+        (s.shortName || "").toLowerCase().includes(q)
+    );
+  }, [schools, debouncedSearch]);
+
+  const MAX_VISIBLE = 8;
 
   async function uploadStudentId(file: File) {
     setUploadingId(true);
@@ -303,53 +336,95 @@ export default function Onboarding() {
               <div className="relative" ref={dropdownRef}>
                 <Label className="text-sm font-semibold mb-2 block">Institution</Label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  {schoolsLoading
+                    ? <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
+                    : <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  }
                   <Input
-                    placeholder="Search your university or college…"
+                    ref={searchInputRef}
+                    placeholder={schoolsLoading ? "Loading institutions..." : "Type to search — e.g. University, CBU..."}
                     value={selectedSchool ? selectedSchool.name : schoolSearch}
+                    disabled={schoolsLoading}
                     onChange={(e) => {
                       setSelectedSchool(null);
                       setSchoolSearch(e.target.value);
                       setShowDropdown(true);
                     }}
-                    onFocus={() => setShowDropdown(true)}
+                    onFocus={() => { if (!selectedSchool) setShowDropdown(true); }}
                     className="h-11 pl-10 pr-10"
+                    autoComplete="off"
                   />
                   {selectedSchool && (
                     <button
-                      onClick={() => { setSelectedSchool(null); setSchoolSearch(""); }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setSelectedSchool(null);
+                        setSchoolSearch("");
+                        setShowDropdown(true);
+                        setTimeout(() => searchInputRef.current?.focus(), 0);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   )}
                 </div>
 
-                {showDropdown && !selectedSchool && (
-                  <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-lg max-h-60 overflow-y-auto">
-                    {filteredSchools.length === 0 ? (
-                      <div className="p-4 text-sm text-muted-foreground text-center">
-                        {schools.length === 0
-                          ? "Loading institutions…"
-                          : "No institution found. Contact support to add yours."}
+                {showDropdown && !selectedSchool && !schoolsLoading && (
+                  <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden">
+                    {/* Header strip */}
+                    <div className="flex items-center justify-between px-4 py-2 bg-muted/40 border-b border-border/60">
+                      <span className="text-xs text-muted-foreground font-medium">
+                        {debouncedSearch.trim()
+                          ? `${filteredSchools.length} result${filteredSchools.length !== 1 ? "s" : ""} for "${debouncedSearch.trim()}"`
+                          : `${schools.length} institutions · Zambia`}
+                      </span>
+                      {filteredSchools.length > MAX_VISIBLE && (
+                        <span className="text-xs text-accent font-semibold">
+                          Showing {MAX_VISIBLE} of {filteredSchools.length}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="max-h-56 overflow-y-auto">
+                      {filteredSchools.length === 0 ? (
+                        <div className="p-5 text-sm text-muted-foreground text-center">
+                          <Search className="w-6 h-6 mx-auto mb-2 opacity-30" />
+                          No institution matched "<span className="font-semibold">{debouncedSearch}</span>".
+                          <br />
+                          <span className="text-xs">Try searching by abbreviation, e.g. "UNZA" or "CBU".</span>
+                        </div>
+                      ) : (
+                        filteredSchools.slice(0, MAX_VISIBLE).map((s, i) => (
+                          <button
+                            key={s.id}
+                            className="w-full text-left px-4 py-3 hover:bg-accent/8 active:bg-accent/15 transition-colors border-b border-border/40 last:border-0 flex items-center gap-3 group"
+                            onClick={() => {
+                              setSelectedSchool(s);
+                              setSchoolSearch("");
+                              setShowDropdown(false);
+                            }}
+                          >
+                            <div className="w-7 h-7 rounded-md bg-[#142042] flex items-center justify-center shrink-0 text-[10px] font-bold text-white/70 group-hover:text-white transition-colors">
+                              {s.shortName ? s.shortName.charAt(0) : s.name.charAt(0)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-sm truncate">{s.name}</div>
+                              {s.shortName && (
+                                <div className="text-xs text-muted-foreground">{s.shortName} · {s.country}</div>
+                              )}
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                          </button>
+                        ))
+                      )}
+                    </div>
+
+                    {filteredSchools.length > MAX_VISIBLE && (
+                      <div className="px-4 py-2.5 bg-muted/30 border-t border-border/60 text-center">
+                        <span className="text-xs text-muted-foreground">
+                          {filteredSchools.length - MAX_VISIBLE} more — keep typing to narrow results
+                        </span>
                       </div>
-                    ) : (
-                      filteredSchools.map((s) => (
-                        <button
-                          key={s.id}
-                          className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0"
-                          onClick={() => {
-                            setSelectedSchool(s);
-                            setSchoolSearch("");
-                            setShowDropdown(false);
-                          }}
-                        >
-                          <div className="font-semibold text-sm">{s.name}</div>
-                          {s.shortName && (
-                            <div className="text-xs text-muted-foreground">{s.shortName} · {s.country}</div>
-                          )}
-                        </button>
-                      ))
                     )}
                   </div>
                 )}
@@ -359,11 +434,13 @@ export default function Onboarding() {
                     <div className="w-9 h-9 rounded-lg bg-[#142042] flex items-center justify-center shrink-0">
                       <Building2 className="w-4 h-4 text-white" />
                     </div>
-                    <div>
-                      <p className="font-semibold text-sm">{selectedSchool.name}</p>
-                      <p className="text-xs text-muted-foreground">{selectedSchool.country}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate">{selectedSchool.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedSchool.shortName && `${selectedSchool.shortName} · `}{selectedSchool.country}
+                      </p>
                     </div>
-                    <CheckCircle2 className="w-5 h-5 text-accent ml-auto" />
+                    <CheckCircle2 className="w-5 h-5 text-accent shrink-0" />
                   </div>
                 )}
               </div>
