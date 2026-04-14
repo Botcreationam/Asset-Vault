@@ -9,37 +9,32 @@ interface AuthState {
   isAuthenticated: boolean;
   login: () => void;
   logout: () => void;
+  refetch: () => Promise<void>;
 }
 
 export function useAuth(): AuthState {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    fetch("/api/auth/user", { credentials: "include" })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<{ user: AuthUser | null }>;
-      })
-      .then((data) => {
-        if (!cancelled) {
-          setUser(data.user ?? null);
-          setIsLoading(false);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setUser(null);
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+  const fetchUser = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/user", { credentials: "include" });
+      if (!res.ok) {
+        setUser(null);
+        return;
+      }
+      const data = await res.json() as { authenticated: boolean; user?: AuthUser };
+      setUser(data.authenticated && data.user ? data.user : null);
+    } catch {
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchUser();
+  }, [fetchUser]);
 
   const login = useCallback(() => {
     const base = import.meta.env.BASE_URL.replace(/\/+$/, "") || "/";
@@ -56,5 +51,6 @@ export function useAuth(): AuthState {
     isAuthenticated: !!user,
     login,
     logout,
+    refetch: fetchUser,
   };
 }
