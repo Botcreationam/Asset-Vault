@@ -7,6 +7,7 @@ import { useAuth } from "@workspace/replit-auth-web";
 import NotFound from "@/pages/not-found";
 
 import { AppLayout } from "@/components/layout/app-layout";
+import { AuthModal } from "@/components/auth-modal";
 
 import Home from "@/pages/home";
 import Browse from "@/pages/browse";
@@ -92,6 +93,7 @@ function App() {
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Router />
         </WouterRouter>
+        <AuthModal />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

@@ -12,6 +12,21 @@ interface AuthState {
   refetch: () => Promise<void>;
 }
 
+// Global state for showing the login modal — components listen via custom events.
+const AUTH_MODAL_EVENT = "acadvault:show-auth-modal";
+
+export function triggerAuthModal() {
+  window.dispatchEvent(new CustomEvent(AUTH_MODAL_EVENT));
+}
+
+export function useAuthModalTrigger(onOpen: () => void) {
+  useEffect(() => {
+    const handler = () => onOpen();
+    window.addEventListener(AUTH_MODAL_EVENT, handler);
+    return () => window.removeEventListener(AUTH_MODAL_EVENT, handler);
+  }, [onOpen]);
+}
+
 export function useAuth(): AuthState {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,12 +52,17 @@ export function useAuth(): AuthState {
   }, [fetchUser]);
 
   const login = useCallback(() => {
-    const base = import.meta.env.BASE_URL.replace(/\/+$/, "") || "/";
-    window.location.href = `/api/login?returnTo=${encodeURIComponent(base)}`;
+    triggerAuthModal();
   }, []);
 
-  const logout = useCallback(() => {
-    window.location.href = "/api/logout";
+  const logout = useCallback(async () => {
+    try {
+      await fetch("/api/logout", { method: "POST", credentials: "include" });
+    } catch {
+      // ignore
+    }
+    setUser(null);
+    window.location.href = "/";
   }, []);
 
   return {

@@ -19,7 +19,7 @@ import {
 import { eq, and, like, or, desc, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import multer from "multer";
-import { objectStorageClient } from "../lib/objectStorage";
+import { supabaseAdmin } from "../lib/supabase";
 import { ensureUserUnits } from "./units";
 import { logAudit } from "../lib/audit";
 import { downloadRateLimit } from "../lib/rate-limit";
@@ -32,7 +32,7 @@ import {
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 
-const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+const STORAGE_BUCKET = "resources";
 
 // ── Rate limiter: max 60 streams per user per resource per hour ──────────────
 const streamAccessTracker = new Map<string, { count: number; resetAt: number }>();
@@ -58,37 +58,14 @@ setInterval(() => {
   }
 }, 30 * 60 * 1000);
 
-function parseStoragePath(fullPath: string): { bucketName: string; objectName: string } {
-  const path = fullPath.startsWith("/") ? fullPath : `/${fullPath}`;
-  const parts = path.split("/");
-  if (parts.length < 3) throw new Error("Invalid storage path");
-  return { bucketName: parts[1], objectName: parts.slice(2).join("/") };
-}
-
-function getPrivateDir(): string {
-  const dir = process.env.PRIVATE_OBJECT_DIR;
-  if (!dir) throw new Error("PRIVATE_OBJECT_DIR is not set");
-  return dir.replace(/\/$/, "");
-}
-
-async function getSignedUrl(bucketName: string, objectName: string, method: "GET" | "PUT", ttlSec: number): Promise<string> {
-  const response = await fetch(`${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      bucket_name: bucketName,
-      object_name: objectName,
-      method,
-      expires_at: new Date(Date.now() + ttlSec * 1000).toISOString(),
-    }),
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Sidecar signing failed (${response.status}): ${text}`);
+async function getSignedUrl(storagePath: string, ttlSec: number): Promise<string> {
+  const { data, error } = await supabaseAdmin.storage
+    .from(STORAGE_BUCKET)
+    .createSignedUrl(storagePath, ttlSec);
+  if (error || !data?.signedUrl) {
+    throw new Error(`Failed to create signed URL: ${error?.message ?? "unknown"}`);
   }
-  const data = await response.json() as { signed_url: string };
-  return data.signed_url;
+  return data.signedUrl;
 }
 
 function parseResourceRow(row: typeof resourcesTable.$inferSelect) {
@@ -159,15 +136,17 @@ router.post("/resources", upload.single("file"), async (req, res) => {
     const file = req.file;
     const objectId = randomUUID();
     const ext = file.originalname.split(".").pop() || "bin";
-    const privateDir = getPrivateDir();
-    const fullPath = `${privateDir}/resources/${objectId}.${ext}`;
-    const { bucketName, objectName } = parseStoragePath(fullPath);
+    const storagePath = `resources/${objectId}.${ext}`;
 
-    const bucket = objectStorageClient.bucket(bucketName);
-    const gcsFile = bucket.file(objectName);
-    await gcsFile.save(file.buffer, {
-      metadata: { contentType: file.mimetype },
-    });
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from(STORAGE_BUCKET)
+      .upload(storagePath, file.buffer, { contentType: file.mimetype, upsert: false });
+
+    if (uploadError) {
+      req.log.error({ err: uploadError }, "Supabase storage upload failed");
+      res.status(500).json({ error: "File upload failed" });
+      return;
+    }
 
     const resourceId = randomUUID();
     const [resource] = await db
@@ -178,7 +157,7 @@ router.post("/resources", upload.single("file"), async (req, res) => {
         description: description ?? null,
         type: type as any,
         folderId,
-        storagePath: fullPath,
+        storagePath,
         fileSize: file.size,
         mimeType: file.mimetype,
         downloadCost: downloadCost ? parseInt(downloadCost, 10) : 5,
@@ -324,9 +303,8 @@ router.get("/resources/:resourceId/view", async (req, res) => {
       return;
     }
 
-    const { bucketName, objectName } = parseStoragePath(resource.storagePath);
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-    const url = await getSignedUrl(bucketName, objectName, "GET", 3600);
+    const url = await getSignedUrl(resource.storagePath, 3600);
 
     await db
       .update(resourcesTable)
@@ -370,55 +348,44 @@ router.get("/resources/:resourceId/stream", enforceDeviceLimit, contentSecurityH
       return;
     }
 
-    const { bucketName, objectName } = parseStoragePath(resource.storagePath);
-    const bucket = objectStorageClient.bucket(bucketName);
-    const file = bucket.file(objectName);
-
-    const [exists] = await file.exists();
-    if (!exists) {
-      res.status(404).send("File not found in storage");
-      return;
-    }
-
-    const [metadata] = await file.getMetadata();
-    const contentType = (metadata.contentType as string) || resource.mimeType || "application/octet-stream";
-    const fileSize = Number(metadata.size) || 0;
+    // Proxy the file through Supabase signed URL
+    const signedUrl = await getSignedUrl(resource.storagePath, 3600);
+    const contentType = resource.mimeType || "application/octet-stream";
 
     res.setHeader("Content-Type", contentType);
     res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(resource.name)}"`);
     res.setHeader("Accept-Ranges", "bytes");
 
-    const rangeHeader = req.headers.range;
-    if (rangeHeader && fileSize > 0) {
-      const parts = rangeHeader.replace(/bytes=/, "").split("-");
-      const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-
-      if (start >= fileSize || end >= fileSize || start > end) {
-        res.status(416).setHeader("Content-Range", `bytes */${fileSize}`).send("Range not satisfiable");
-        return;
-      }
-
-      res.status(206);
-      res.setHeader("Content-Range", `bytes ${start}-${end}/${fileSize}`);
-      res.setHeader("Content-Length", String(end - start + 1));
-
-      const readStream = file.createReadStream({ start, end });
-      readStream.on("error", (err) => {
-        req.log.error({ err }, "Stream range error");
-        if (!res.headersSent) res.status(500).send("Stream error");
-      });
-      readStream.pipe(res);
-    } else {
-      if (fileSize) res.setHeader("Content-Length", String(fileSize));
-
-      const readStream = file.createReadStream();
-      readStream.on("error", (err) => {
-        req.log.error({ err }, "Stream error");
-        if (!res.headersSent) res.status(500).send("Stream error");
-      });
-      readStream.pipe(res);
+    const fetchHeaders: Record<string, string> = {};
+    if (req.headers.range) {
+      fetchHeaders["Range"] = req.headers.range;
     }
+
+    const upstream = await fetch(signedUrl, { headers: fetchHeaders });
+    if (!upstream.ok && upstream.status !== 206) {
+      res.status(404).send("File not found in storage");
+      return;
+    }
+
+    res.status(upstream.status);
+    const passthroughHeaders = ["content-length", "content-range", "accept-ranges"];
+    for (const h of passthroughHeaders) {
+      const val = upstream.headers.get(h);
+      if (val) res.setHeader(h, val);
+    }
+
+    if (!upstream.body) {
+      res.end();
+      return;
+    }
+
+    const { Readable } = await import("stream");
+    const readable = Readable.fromWeb(upstream.body as import("stream/web").ReadableStream);
+    readable.on("error", (err) => {
+      req.log.error({ err }, "Stream error");
+      if (!res.headersSent) res.status(500).send("Stream error");
+    });
+    readable.pipe(res);
 
     db.update(resourcesTable)
       .set({ viewCount: resource.viewCount + 1 })
@@ -511,9 +478,8 @@ router.post("/resources/:resourceId/download", downloadRateLimit, async (req, re
       .set({ downloadCount: resource.downloadCount + 1 })
       .where(eq(resourcesTable.id, resource.id));
 
-    const { bucketName, objectName } = parseStoragePath(resource.storagePath);
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    const url = await getSignedUrl(bucketName, objectName, "GET", 900);
+    const url = await getSignedUrl(resource.storagePath, 900);
 
     res.json({
       url,

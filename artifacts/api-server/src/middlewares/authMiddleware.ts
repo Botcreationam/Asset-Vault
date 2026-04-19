@@ -1,4 +1,3 @@
-import * as oidc from "openid-client";
 import { type Request, type Response, type NextFunction } from "express";
 import type { AuthUser } from "@workspace/api-zod";
 import { db, usersTable } from "@workspace/db";
@@ -6,11 +5,8 @@ import { eq } from "drizzle-orm";
 import { getTrialInfo } from "../lib/trial";
 import {
   clearSession,
-  getOidcConfig,
   getSessionId,
   getSession,
-  updateSession,
-  type SessionData,
 } from "../lib/auth";
 
 declare global {
@@ -19,40 +15,12 @@ declare global {
 
     interface Request {
       isAuthenticated(): this is AuthedRequest;
-
       user?: User | undefined;
     }
 
     export interface AuthedRequest {
       user: User;
     }
-  }
-}
-
-async function refreshIfExpired(
-  sid: string,
-  session: SessionData,
-): Promise<SessionData | null> {
-  const now = Math.floor(Date.now() / 1000);
-  if (!session.expires_at || now <= session.expires_at) return session;
-
-  if (!session.refresh_token) return null;
-
-  try {
-    const config = await getOidcConfig();
-    const tokens = await oidc.refreshTokenGrant(
-      config,
-      session.refresh_token,
-    );
-    session.access_token = tokens.access_token;
-    session.refresh_token = tokens.refresh_token ?? session.refresh_token;
-    session.expires_at = tokens.expiresIn()
-      ? now + tokens.expiresIn()!
-      : session.expires_at;
-    await updateSession(sid, session);
-    return session;
-  } catch {
-    return null;
   }
 }
 
@@ -78,13 +46,6 @@ export async function authMiddleware(
     return;
   }
 
-  const refreshed = await refreshIfExpired(sid, session);
-  if (!refreshed) {
-    await clearSession(res, sid);
-    next();
-    return;
-  }
-
   const [dbUser] = await db
     .select({
       role: usersTable.role,
@@ -102,12 +63,12 @@ export async function authMiddleware(
       rejectionReason: usersTable.rejectionReason,
     })
     .from(usersTable)
-    .where(eq(usersTable.id, refreshed.user.id));
+    .where(eq(usersTable.id, session.user.id));
 
   const trial = getTrialInfo(dbUser?.createdAt ?? new Date());
 
   req.user = {
-    ...refreshed.user,
+    ...session.user,
     role: (dbUser?.role ?? "student") as "student" | "moderator" | "admin",
     username: dbUser?.username ?? undefined,
     nickname: dbUser?.nickname ?? null,
