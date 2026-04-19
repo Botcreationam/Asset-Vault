@@ -9,6 +9,7 @@ import {
   SESSION_COOKIE,
   SESSION_TTL,
   type SessionData,
+  type SessionUser,
 } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { sendApprovalEmail, sendRejectionEmail } from "../lib/email";
@@ -112,6 +113,16 @@ async function upsertUser(supabaseUserId: string, email: string | null, meta?: R
   }
 
   return user;
+}
+
+function toSessionUser(dbUser: { id: string; email: string | null; firstName: string | null; lastName: string | null; profileImageUrl: string | null }): SessionUser {
+  return {
+    id: dbUser.id,
+    email: dbUser.email ?? undefined,
+    firstName: dbUser.firstName ?? undefined,
+    lastName: dbUser.lastName ?? undefined,
+    profileImageUrl: dbUser.profileImageUrl ?? undefined,
+  };
 }
 
 // ── GET /api/auth/user ────────────────────────────────────────────────────────

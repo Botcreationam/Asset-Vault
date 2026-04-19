@@ -17,14 +17,36 @@ export const AuthUserRole = {
   admin: "admin",
 } as const;
 
+export type AuthUserApprovalStatus =
+  (typeof AuthUserApprovalStatus)[keyof typeof AuthUserApprovalStatus];
+
+export const AuthUserApprovalStatus = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
+} as const;
+
 export interface AuthUser {
   id: string;
   username?: string;
+  email?: string;
   firstName?: string;
   lastName?: string;
   profileImageUrl?: string;
   role: AuthUserRole;
   unitsBalance: number;
+  nickname?: string | null;
+  program?: string | null;
+  academicYear?: string | null;
+  semester?: string | null;
+  onboardingCompleted: boolean;
+  schoolId?: string | null;
+  institutionalEmail?: string | null;
+  approvalStatus: AuthUserApprovalStatus;
+  rejectionReason?: string | null;
+  isTrialActive: boolean;
+  trialDaysRemaining: number;
+  trialEndsAt: string;
 }
 
 export interface GetCurrentAuthUserResponse {

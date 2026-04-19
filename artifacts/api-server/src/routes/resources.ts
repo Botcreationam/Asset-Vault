@@ -30,7 +30,7 @@ import {
 } from "../lib/content-protection";
 
 const router: IRouter = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 const STORAGE_BUCKET = "resources";
 

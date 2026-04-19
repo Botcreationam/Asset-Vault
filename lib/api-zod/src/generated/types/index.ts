@@ -10,6 +10,7 @@ export * from "./adminUser";
 export * from "./adminUserListResponse";
 export * from "./adminUserRole";
 export * from "./authUser";
+export * from "./authUserApprovalStatus";
 export * from "./authUserRole";
 export * from "./chatUser";
 export * from "./chatUserListResponse";

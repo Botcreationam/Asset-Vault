@@ -5,14 +5,28 @@
  * AcadVault API
  * OpenAPI spec version: 0.1.0
  */
+import type { AuthUserApprovalStatus } from "./authUserApprovalStatus";
 import type { AuthUserRole } from "./authUserRole";
 
 export interface AuthUser {
   id: string;
   username?: string;
+  email?: string;
   firstName?: string;
   lastName?: string;
   profileImageUrl?: string;
   role: AuthUserRole;
   unitsBalance: number;
+  nickname?: string | null;
+  program?: string | null;
+  academicYear?: string | null;
+  semester?: string | null;
+  onboardingCompleted: boolean;
+  schoolId?: string | null;
+  institutionalEmail?: string | null;
+  approvalStatus: AuthUserApprovalStatus;
+  rejectionReason?: string | null;
+  isTrialActive: boolean;
+  trialDaysRemaining: number;
+  trialEndsAt: Date;
 }

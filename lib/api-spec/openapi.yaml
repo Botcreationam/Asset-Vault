@@ -662,6 +662,8 @@ components:
           type: string
         username:
           type: string
+        email:
+          type: string
         firstName:
           type: string
         lastName:
@@ -673,10 +675,48 @@ components:
           enum: [student, moderator, admin]
         unitsBalance:
           type: integer
+        nickname:
+          type: string
+          nullable: true
+        program:
+          type: string
+          nullable: true
+        academicYear:
+          type: string
+          nullable: true
+        semester:
+          type: string
+          nullable: true
+        onboardingCompleted:
+          type: boolean
+        schoolId:
+          type: string
+          nullable: true
+        institutionalEmail:
+          type: string
+          nullable: true
+        approvalStatus:
+          type: string
+          enum: [pending, approved, rejected]
+        rejectionReason:
+          type: string
+          nullable: true
+        isTrialActive:
+          type: boolean
+        trialDaysRemaining:
+          type: integer
+        trialEndsAt:
+          type: string
+          format: date-time
       required:
         - id
         - role
         - unitsBalance
+        - onboardingCompleted
+        - approvalStatus
+        - isTrialActive
+        - trialDaysRemaining
+        - trialEndsAt
 
     Folder:
       type: object
